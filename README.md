@@ -18,7 +18,7 @@ Please, if you use this code, cite the [preprint](https://arxiv.org/pdf/2202.045
 ```
 
 ## Instalation 
-The installation is straightforward by creating a conda virtual environment named <code>HH-VAEM</code>, using the provided <code>environment.yml</code> file:
+The installation is straightforward using the following instruction, that creates a conda virtual environment named <code>HH-VAEM</code> using the provided <code>environment.yml</code> file:
 ```
 conda env create -f environment.yml
 ```
