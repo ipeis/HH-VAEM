@@ -58,11 +58,9 @@ python test_splits.py --model HHVAEM --dataset boston
 ```
 ### Experiments
 
-<br>
 <p align="center">
-  <img width="300" src="imgs/hmc.png">
+  <img width="800" src="imgs/hmc.png">
 </p>
-<br>
 
 The experiments in the paper can be executed using:
 ```
