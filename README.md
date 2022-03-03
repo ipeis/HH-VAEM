@@ -78,7 +78,7 @@ Once this is executed on all the splits, you can plot the SAIA error curves or o
 python active_learning_plots.py --models VAEM HHVAEM --dataset boston
 
 # Example for running the OoD experiment using MNIST and Fashion-MNIST as OoD:
-python ood.py --model HHVAEM --dataset mnist --dataset_ood fashion_mnist --split 0
+python ood_splits.py --model HHVAEM --dataset mnist --dataset_ood fashion_mnist
 ```
 
 <br>
