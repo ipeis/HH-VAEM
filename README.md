@@ -43,7 +43,7 @@ Partial VAE).
 - <code>HVAEM</code>: A Hierarchical VAEM with two layers of latent variables and a Gaussian encoder.
 - <code>HMCVAEM</code>: A VAEM that includes a tuned HMC sampler for the true posterior.
 - For MNIST datasets (non heterogeneous data), use <code>HHVAE</code>, <code>VAE</code>, <code>HVAE</code> and <code>HMCVAE</code>.
-- 
+
 By default, the test stage will run at the end of the training stage. This can be cancelled with <code>--test 0</code> for manually running the test using:
 ```
 # Example for testing HH-VAEM on Boston dataset
