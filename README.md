@@ -74,6 +74,9 @@ python active_learning_plots.py --models VAEM HHVAEM --dataset boston
 python ood.py --model HHVAEM --dataset mnist --dataset_ood fashion_mnist --split 0
 ```
 
+### Help
+Use the <code>--help</code> option for documentation on the usage of each script. 
+
 ## Contributors
 [Ignacio Peis](http://www.tsc.uc3m.es/~ipeis/index.html) <br>
 [Chao Ma](https://chao-ma.org/) <br>
