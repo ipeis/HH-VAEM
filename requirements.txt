@@ -1,0 +1,15 @@
+# This file may be used to create an environment using:
+# $ conda create --name HH-VAEM --file requirements.txt
+# platform: linux-64
+pytorch==1.7.1
+torchvision==0.8.2
+pytorch-lightning==1.5.1
+matplotlib
+scipy
+h5py
+scikit-learn
+pandas
+openpyxl
+termcolor
+xlrd
+seaborn

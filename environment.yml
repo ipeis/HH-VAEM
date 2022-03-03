@@ -1,0 +1,22 @@
+# Usage:  $ conda env create -f environment.yml
+# Please add to the pip section the packages that drop the error "ResolvePackageNotFound"
+name: HH-VAEM
+channels:
+  - pytorch
+  - defaults
+dependencies:
+  - python=3.7
+  - pytorch=1.7.1
+  - torchvision=0.8.2
+  - pip=20.0.2=py37_1
+  - pip:
+      - pytorch-lightning==1.5.1
+      - matplotlib
+      - scipy
+      - pandas
+      - openpyxl
+      - termcolor
+      - xlrd
+      - seaborn
+      - h5py
+      - scikit-learn
