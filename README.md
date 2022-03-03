@@ -25,34 +25,42 @@ conda env create -f environment.yml
 ```
 
 ## Usage
-The project is developed in the recent research framework [PyTorch Lightning](https://www.pytorchlightning.ai/). The HH-VAEM model is implemented as a [<code>LightningModule</code>](https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html) that is trained by means of a [<code>Trainer</code>](https://pytorch-lightning.readthedocs.io/en/latest/common/trainer.html). You can train a model by using:
+The project is developed in the recent research framework [PyTorch Lightning](https://www.pytorchlightning.ai/). The HH-VAEM model is implemented as a [<code>LightningModule</code>](https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html) that is trained by means of a [<code>Trainer</code>](https://pytorch-lightning.readthedocs.io/en/latest/common/trainer.html). A model can be trained by using:
 ```
 # Example for training HH-VAEM on Boston dataset
 python train.py --model HHVAEM --dataset boston --split 0
 ```
-This will automatically download the <code>boston</code> dataset, split in 10 train/test splits and train HH-VAEM on the training split <code>0</code>. Both <code>data/</code> and <code>logs/</code> folders will be created to store the dataset and model checkpoints, respectively. You can modify the variable <code>LOGDIR</code> in <code>src/configs</code> to change the directory where these folders will be created.
+This will automatically download the <code>boston</code> dataset, split in 10 train/test splits and train HH-VAEM on the training split <code>0</code>. Both <code>data/</code> and <code>logs/</code> folders will be created to store the dataset and model checkpoints, respectively. The variable <code>LOGDIR</code> can be modified in <code>src/configs.py</code> to change the directory where these folders will be created.
 
-You can choose among the following datasets:
+The following datasets are available:
 - A total of 10 UCI datasets: <code>avocado</code>, <code>boston</code>, <code>energy</code>, <code>wine</code>, <code>diabetes</code>, <code>concrete</code>, <code>naval</code>, <code>yatch</code>, <code>bank</code> or <code>insurance</code>.
 - The MNIST datasets: <code>mnist</code> or <code>fashion_mnist</code>.
 
-And also the following models are available:
+And also the following models:
 - <code>HHVAEM</code>: the proposed model in the paper.
 - 
-By default, the test stage will run at the end of the training stage. You can cancel this with <code>--test 0</code> and manually run the test using:
+By default, the test stage will run at the end of the training stage. This can be cancelled with <code>--test 0</code> for manually running the test using:
 ```
 # Example for testing HH-VAEM on Boston dataset
 python test.py --model HHVAEM --dataset boston --split 0
 ```
-which will load the trained model to be tested on the <code>boston</code> test split number <code>0</code>. Once all the splits are tested, you can obtain the average results using the script in the <code>run</code> folder:
+which will load the trained model to be tested on the <code>boston</code> test split number <code>0</code>. Once all the splits are tested, the average results can be obtained using the script in the <code>run/</code> folder:
 ```
-# Example for running the SAIA experiment with HH-VAEM on Boston dataset
+# Example for obtaining the average test results with HH-VAEM on Boston dataset
 python test_splits.py --model HHVAEM --dataset boston
 ```
 ## Experiments
-The SAIA experiment of the paper can be executed using:
+The experiments in the paper can be executed using:
 ```
 # Example for running the SAIA experiment with HH-VAEM on Boston dataset
-python active_learning.py --model HHVAEM --dataset boston --split 0
+python active_learning.py --model HHVAEM --dataset boston --method mi --split 0
+# Example for running the OoD experiment using MNIST and Fashion-MNIST as OoD:
+python ood.py --model HHVAEM --dataset mnist --dataset_ood fashion_mnist --split 0
 ```
-Once this is executed on all the splits, you can 
+Once this is executed on all the splits, you can plot the SAIA curves or obtain the average OoD metrics using the scripts in the <code>run/</code> folder:
+```
+# Example for running the SAIA experiment with HH-VAEM on Boston dataset
+python active_learning_plots.py --models VAEM HHVAEM --dataset boston
+# Example for running the OoD experiment using MNIST and Fashion-MNIST as OoD:
+python ood.py --model HHVAEM --dataset mnist --dataset_ood fashion_mnist --split 0
+```
