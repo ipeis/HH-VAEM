@@ -54,6 +54,7 @@ The experiments in the paper can be executed using:
 ```
 # Example for running the SAIA experiment with HH-VAEM on Boston dataset
 python active_learning.py --model HHVAEM --dataset boston --method mi --split 0
+
 # Example for running the OoD experiment using MNIST and Fashion-MNIST as OoD:
 python ood.py --model HHVAEM --dataset mnist --dataset_ood fashion_mnist --split 0
 ```
@@ -61,6 +62,7 @@ Once this is executed on all the splits, you can plot the SAIA curves or obtain 
 ```
 # Example for running the SAIA experiment with HH-VAEM on Boston dataset
 python active_learning_plots.py --models VAEM HHVAEM --dataset boston
+
 # Example for running the OoD experiment using MNIST and Fashion-MNIST as OoD:
 python ood.py --model HHVAEM --dataset mnist --dataset_ood fashion_mnist --split 0
 ```
