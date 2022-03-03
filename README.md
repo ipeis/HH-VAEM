@@ -76,7 +76,7 @@ python ood.py --model HHVAEM --dataset mnist --dataset_ood fashion_mnist --split
 
 <br>
 <p align="center">
-  <img width="500" src="imgs/hh-vaem.png">
+  <img width="500" src="imgs/saia_curves.png">
 </p>
 <br>
 
