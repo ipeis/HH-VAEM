@@ -36,7 +36,8 @@ This will automatically download the <code>boston</code> dataset, split in 10 tr
 The following datasets are available:
 - A total of 10 UCI datasets: <code>avocado</code>, <code>boston</code>, <code>energy</code>, <code>wine</code>, <code>diabetes</code>, <code>concrete</code>, <code>naval</code>, <code>yatch</code>, <code>bank</code> or <code>insurance</code>.
 - The MNIST datasets: <code>mnist</code> or <code>fashion_mnist</code>.
-
+- More datasets can be easily added to <code>src/datasets.py</code>.
+For each dataset, the corresponding parameter configuration must be added to <code>src/configs.py</code>
 And also the following models (implemented in <code>src/models/</code>):
 - <code>HHVAEM</code>: the proposed model in the paper.
 - <code>VAEM</code>: the VAEM strategy presented in [(Ma et al., 2020)](https://arxiv.org/pdf/2006.11941.pdf) with Gaussian encoder (without including the
