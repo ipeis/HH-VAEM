@@ -75,7 +75,7 @@ python ood.py --model HHVAEM --dataset mnist --dataset_ood fashion_mnist --split
 ```
 
 ### Help
-Use the <code>--help</code> option for documentation on the usage of each script. 
+Use the <code>--help</code> option for documentation on the usage of any of the mentioned scripts. 
 
 ## Contributors
 [Ignacio Peis](http://www.tsc.uc3m.es/~ipeis/index.html) <br>
