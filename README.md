@@ -42,10 +42,15 @@ By default, the test stage will run at the end of the training stage. You can ca
 # Example for testing HH-VAEM on Boston dataset
 python test.py --model HHVAEM --dataset boston --split 0
 ```
-which will load the trained model to be tested on the <code>boston</code> test split number <code>0</code>.
+which will load the trained model to be tested on the <code>boston</code> test split number <code>0</code>. Once all the splits are tested, you can obtain the average results using:
+```
+# Example for running the SAIA experiment with HH-VAEM on Boston dataset
+python test_splits.py --model HHVAEM --dataset boston
+```
 ## Experiments
 The SAIA experiment of the paper can be executed using:
 ```
 # Example for running the SAIA experiment with HH-VAEM on Boston dataset
 python active_learning.py --model HHVAEM --dataset boston --split 0
 ```
+Once all the splits are executed, you can 
