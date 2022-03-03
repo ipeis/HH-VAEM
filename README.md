@@ -74,6 +74,12 @@ python active_learning_plots.py --models VAEM HHVAEM --dataset boston
 python ood.py --model HHVAEM --dataset mnist --dataset_ood fashion_mnist --split 0
 ```
 
+<br>
+<p align="center">
+  <img width="500" src="imgs/hh-vaem.png">
+</p>
+<br>
+
 ### Help
 Use the <code>--help</code> option for documentation on the usage of any of the mentioned scripts. 
 
