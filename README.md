@@ -40,7 +40,7 @@ The following datasets are available:
  
 For each dataset, the corresponding parameter configuration must be added to <code>src/configs.py</code>.
 
-The following models are available (implemented in <code>src/models/</code>):
+The following models are also available (implemented in <code>src/models/</code>):
 - <code>HHVAEM</code>: the proposed model in the paper.
 - <code>VAEM</code>: the VAEM strategy presented in [(Ma et al., 2020)](https://arxiv.org/pdf/2006.11941.pdf) with Gaussian encoder (without including the
 Partial VAE).
