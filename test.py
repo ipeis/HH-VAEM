@@ -24,8 +24,6 @@ parser.add_argument('--split', type=int, default=0, metavar='N',
                     help='train/test split index to use (default splits: 0, ..., 9)')
 parser.add_argument('--version', type=str, default='version_0', 
                     help='name for the log in Tensorboard (defaul None for "version_0")')
-parser.add_argument('--test', type=int, default=1, 
-                    help='testing at training end (1) or not (0)')   
 parser.add_argument('--gpu', type=int, default=1,
                     help='use gpu via cuda (1) or cpu (0)')
 args = parser.parse_args()
