@@ -31,7 +31,7 @@ The project is developed in the recent research framework [PyTorch Lightning](ht
 # Example for training HH-VAEM on Boston dataset
 python train.py --model HHVAEM --dataset boston --split 0
 ```
-This will automatically download the <code>boston</code> dataset, split in 10 train/test splits and train HH-VAEM on the training split <code>0</code>. Both <code>data/</code> and <code>logs/</code> folders will be created to store the dataset and model checkpoints, respectively. The variable <code>LOGDIR</code> can be modified in <code>src/configs.py</code> to change the directory where these folders will be created (this might be useful for avoid overloads in network filesystems).
+This will automatically download the <code>boston</code> dataset, split in 10 train/test splits and train HH-VAEM on the training split <code>0</code>. Both <code>data/</code> and <code>logs/</code> folders will be created to store the dataset and model checkpoints, respectively. The variable <code>LOGDIR</code> can be modified in <code>src/configs.py</code> to change the directory where these folders will be created (this might be useful for avoid overloads in network file systems).
 
 The following datasets are available:
 - A total of 10 UCI datasets: <code>avocado</code>, <code>boston</code>, <code>energy</code>, <code>wine</code>, <code>diabetes</code>, <code>concrete</code>, <code>naval</code>, <code>yatch</code>, <code>bank</code> or <code>insurance</code>.
