@@ -26,7 +26,7 @@ conda env create -f environment.yml
 
 ## Usage
 
-### Train / test
+### Training
 The project is developed in the recent research framework [PyTorch Lightning](https://www.pytorchlightning.ai/). The HH-VAEM model is implemented as a [<code>LightningModule</code>](https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html) that is trained by means of a [<code>Trainer</code>](https://pytorch-lightning.readthedocs.io/en/latest/common/trainer.html). A model can be trained by using:
 ```
 # Example for training HH-VAEM on Boston dataset
@@ -56,7 +56,7 @@ which will load the trained model to be tested on the <code>boston</code> test s
 # Example for obtaining the average test results with HH-VAEM on Boston dataset
 python test_splits.py --model HHVAEM --dataset boston
 ```
-## Experiments
+### Experiments
 The experiments in the paper can be executed using:
 ```
 # Example for running the SAIA experiment with HH-VAEM on Boston dataset
