@@ -15,7 +15,7 @@ Please, if you use this code, cite the [preprint](https://arxiv.org/pdf/2202.045
 
 <br>
 <p align="center">
-  <img width="400" src="imgs/hh-vaem.png">
+  <img width="300" src="imgs/hh-vaem.png">
 </p>
 <br>
 
