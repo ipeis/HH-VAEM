@@ -21,18 +21,15 @@ plt.rcParams['font.size'] = 20
 plt.tight_layout()
 
 parser = argparse.ArgumentParser(description='Plot SAIA curves. Plots the VAEM + KL method and the input models + MI method')
-parser.add_argument('--dataset', type=str, default='boston', metavar='N',
-                    help='Dataset name')
 parser.add_argument('--models',  nargs='+', type=str, default=('VAEM',),
-                    help='models to plot')
+                    help='models to plot (VAE, HVAE, HMCVAE, HHVAE, VAEM, HVAEM, HMCVAEM, HHVAEM)')
+parser.add_argument('--dataset', type=str, default='boston',
+                    help='dataset to train (boston, mnist, ...)')
 parser.add_argument('--set', type=str, default="test",
-                    help='train or test set')         
-
+                    help='train or test set')
 args = parser.parse_args()
 
 dataset = args.dataset
-
-
 
 models_list = args.models
 metric_name = configs_active_learning[args.dataset]['metric']

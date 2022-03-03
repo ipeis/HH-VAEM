@@ -22,17 +22,17 @@ This script performs the OoD experiment on all the splits, sequentially using th
 GPU or CPU. It is preferrable to parallelize computations using your distributed system 
 and calling the script ood.py for a single split.
 """
-parser = argparse.ArgumentParser(description='OoD experiment')
-parser.add_argument('--model', type=str, default="VAE", metavar='N',
-                    help='name of the model')
-parser.add_argument('--version', type=str, default="version_0",
-                    help='name of the version')
-parser.add_argument('--dataset', type=str, default="mnist", metavar='N',
+parser = argparse.ArgumentParser(description='Average OoD detection metrics on all the test splits')
+parser.add_argument('--model', type=str, default='HHVAEM',
+                    help='model to use (VAE, HVAE, HMCVAE, HHVAE, VAEM, HVAEM, HMCVAEM, HHVAEM)')
+parser.add_argument('--version', type=str, default=None,
+                    help='name for the log in Tensorboard (defaul None for "version_0")')
+parser.add_argument('--dataset', type=str, default="mnist",
                     help='dataset ON distribution')
-parser.add_argument('--dataset_ood', type=str, default="fashion_mnist", metavar='N',
+parser.add_argument('--dataset_ood', type=str, default="fashion_mnist",
                     help='dataset OUT OF distribution')                   
-parser.add_argument('--samples', type=int, default=100, metavar='N',
-                    help='repetitions for each sample')
+parser.add_argument('--samples', type=int, default=100,
+                    help='latent samples')
 parser.add_argument('--load', type=int, default=1,
                     help='For loading pre computed split results (1) or computing first (0)')
 parser.add_argument('--gpu', type=int, default=1,

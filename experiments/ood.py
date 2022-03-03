@@ -22,15 +22,15 @@ from sklearn.metrics import average_precision_score as avpr
 colors = list(mcolors.TABLEAU_COLORS)
 
 parser = argparse.ArgumentParser(description='OoD experiment')
-parser.add_argument('--model', type=str, default="VAE", metavar='N',
-                    help='name of the model')
-parser.add_argument('--dataset', type=str, default="mnist", metavar='N',
-                    help='dataset ON distribution')
-parser.add_argument('--dataset_ood', type=str, default="fashion_mnist", metavar='N',
+parser.add_argument('--model', type=str, default='HHVAEM',
+                    help='model to use (VAE, HVAE, HMCVAE, HHVAE, VAEM, HVAEM, HMCVAEM, HHVAEM)')
+parser.add_argument('--dataset', type=str, default='boston',
+                    help='dataset to train (boston, mnist, ...)')
+parser.add_argument('--dataset_ood', type=str, default="fashion_mnist",
                     help='dataset OUT OF distribution')                   
 parser.add_argument('--split', type=int, default=0,
                     help='index of the train/test partition')
-parser.add_argument('--samples', type=int, default=100, metavar='N',
+parser.add_argument('--samples', type=int, default=100,
                     help='repetitions for each sample')
 parser.add_argument('--gpu', type=int, default=1,
                     help='use gpu via cuda (1) or cpu (0)')

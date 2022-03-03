@@ -13,7 +13,7 @@ import argparse
 
 parser = argparse.ArgumentParser(description='Train the HH-VAEM model and baselines')
 
-parser.add_argument('--model', type=str, default='VAEM',
+parser.add_argument('--model', type=str, default='HHVAEM',
                     help='model to use (VAE, HVAE, HMCVAE, HHVAE, VAEM, HVAEM, HMCVAEM, HHVAEM)')
 parser.add_argument('--dataset', type=str, default='boston', 
                     help='dataset to train (boston, mnist, ...)')

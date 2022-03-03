@@ -12,11 +12,11 @@ from src import *
 import time
 import argparse
 
-parser = argparse.ArgumentParser(description='SAIA experiment for the HH-VAEM model')
+parser = argparse.ArgumentParser(description='SAIA experiment')
 
-parser.add_argument('--model', type=str, default='VAEM',
+parser.add_argument('--model', type=str, default='HHVAEM',
                     help='model to use (VAE, HVAE, HMCVAE, HHVAE, VAEM, HVAEM, HMCVAEM, HHVAEM)')
-parser.add_argument('--dataset', type=str, default='boston', 
+parser.add_argument('--dataset', type=str, default='boston',
                     help='dataset to train (boston, mnist, ...)')
 parser.add_argument('--split', type=int, default=0,
                     help='train/test split index to use (default splits: 0, ..., 9)')

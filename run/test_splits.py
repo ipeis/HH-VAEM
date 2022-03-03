@@ -18,12 +18,12 @@ distributed system and calling the script test.py for a single split.
 """
 
 parser = argparse.ArgumentParser(description='Average test evaluation on all the test splits')
-parser.add_argument('--dataset', type=str, default="boston", metavar='N',
-                    help='dataset')
-parser.add_argument('--model', type=str, default="VAEM", metavar='N',
-                    help='name of the model (VAE, HVAE or SHVAE)')
-parser.add_argument('--version', type=str, default="version_0", metavar='N',
-                    help='name of the model (VAE, HVAE or SHVAE)')
+parser.add_argument('--model', type=str, default='HHVAEM',
+                    help='model to use (VAE, HVAE, HMCVAE, HHVAE, VAEM, HVAEM, HMCVAEM, HHVAEM)')
+parser.add_argument('--dataset', type=str, default='boston',
+                    help='dataset to train (boston, mnist, ...)')
+parser.add_argument('--version', type=str, default=None,
+                    help='name for the log in Tensorboard (defaul None for "version_0")')
 parser.add_argument('--load', type=int, default=1,
                     help='For loading pre computed split results (1) or computing first (0)')
 parser.add_argument('--gpu', type=int, default=1,
