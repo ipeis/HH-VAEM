@@ -5,7 +5,6 @@ This repository contains the official Pytorch implementation of the Hierarchical
 <br>
 <p align="center">
   <img width="300" src="imgs/hh-vaem.png">
-  <img width="300" src="imgs/hmc.png">
 </p>
 <br>
 
@@ -58,6 +57,13 @@ which will load the trained model to be tested on the <code>boston</code> test s
 python test_splits.py --model HHVAEM --dataset boston
 ```
 ### Experiments
+
+<br>
+<p align="center">
+  <img width="300" src="imgs/hmc.png">
+</p>
+<br>
+
 The experiments in the paper can be executed using:
 ```
 # Example for running the SAIA experiment with HH-VAEM on Boston dataset
