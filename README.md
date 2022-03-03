@@ -69,9 +69,7 @@ python ood.py --model HHVAEM --dataset mnist --dataset_ood fashion_mnist --split
 
 ## Contributors
 [Ignacio Peis](http://www.tsc.uc3m.es/~ipeis/index.html)
-
 [Chao Ma](https://chao-ma.org/)
-
 [José Miguel Hernández-Lobato](https://jmhl.org/)
 
 ## Contact
