@@ -5,6 +5,7 @@ This repository contains the official Pytorch implementation of the Hierarchical
 <br>
 <p align="center">
   <img width="300" src="imgs/hh-vaem.png">
+  <img width="300" src="imgs/hmc.png">
 </p>
 <br>
 
