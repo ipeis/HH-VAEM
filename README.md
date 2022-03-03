@@ -66,3 +66,9 @@ python active_learning_plots.py --models VAEM HHVAEM --dataset boston
 # Example for running the OoD experiment using MNIST and Fashion-MNIST as OoD:
 python ood.py --model HHVAEM --dataset mnist --dataset_ood fashion_mnist --split 0
 ```
+
+## Contributors
+[Ignacio Peis](http://www.tsc.uc3m.es/~ipeis/index.html)
+
+## Contact
+For further information: <a href="mailto:ipeis@tsc.uc3m.es">ipeis@tsc.uc3m.es</a>
