@@ -3,6 +3,12 @@ This repository contains the official Pytorch implementation of the Hierarchical
 in the  paper 
 [Missing Data Imputation and Acquisition with Deep Hierarchical Models and Hamiltonian Monte Carlo](https://arxiv.org/pdf/2202.04599.pdf).
 
+<br>
+<p align="center">
+  <img width="300" src="imgs/hh-vaem.png">
+</p>
+<br>
+
 Please, if you use this code, cite the [preprint](https://arxiv.org/pdf/2202.04599.pdf) using:
 ```
 @article{peis2022missing,
@@ -12,12 +18,6 @@ Please, if you use this code, cite the [preprint](https://arxiv.org/pdf/2202.045
   year={2022}
 }
 ```
-
-<br>
-<p align="center">
-  <img width="300" src="imgs/hh-vaem.png">
-</p>
-<br>
 
 ## Instalation 
 The installation is straightforward by creating a conda virtual environment, using the provided <code>environment.yml</code> file:
