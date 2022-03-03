@@ -25,6 +25,8 @@ conda env create -f environment.yml
 ```
 
 ## Usage
+
+### Training
 The project is developed in the recent research framework [PyTorch Lightning](https://www.pytorchlightning.ai/). The HH-VAEM model is implemented as a [<code>LightningModule</code>](https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html) that is trained by means of a [<code>Trainer</code>](https://pytorch-lightning.readthedocs.io/en/latest/common/trainer.html). A model can be trained by using:
 ```
 # Example for training HH-VAEM on Boston dataset
@@ -36,10 +38,15 @@ The following datasets are available:
 - A total of 10 UCI datasets: <code>avocado</code>, <code>boston</code>, <code>energy</code>, <code>wine</code>, <code>diabetes</code>, <code>concrete</code>, <code>naval</code>, <code>yatch</code>, <code>bank</code> or <code>insurance</code>.
 - The MNIST datasets: <code>mnist</code> or <code>fashion_mnist</code>.
 
-And also the following models:
+And also the following models (implemented in <code>src/models/</code>):
 - <code>HHVAEM</code>: the proposed model in the paper.
-- 
-By default, the test stage will run at the end of the training stage. This can be cancelled with <code>--test 0</code> for manually running the test using:
+- <code>VAEM</code>: the VAEM strategy presented in [(Ma et al., 2020)](https://arxiv.org/pdf/2006.11941.pdf) with Gaussian encoder (without including the
+Partial VAE).
+- <code>HVAEM</code>: A Hierarchical VAEM with two layers of latent variables and a Gaussian encoder.
+- <code>HMCVAEM</code>: A VAEM that includes a tuned HMC sampler for the true posterior.
+- For MNIST datasets (non heterogeneous data), use <code>HHVAE</code>, <code>VAE</code>, <code>HVAE</code> and <code>HMCVAE</code>.
+
+By default, the test stage will be executed at the end of the training stage. This can be cancelled with <code>--test 0</code> for manually running the test using:
 ```
 # Example for testing HH-VAEM on Boston dataset
 python test.py --model HHVAEM --dataset boston --split 0
@@ -49,7 +56,7 @@ which will load the trained model to be tested on the <code>boston</code> test s
 # Example for obtaining the average test results with HH-VAEM on Boston dataset
 python test_splits.py --model HHVAEM --dataset boston
 ```
-## Experiments
+### Experiments
 The experiments in the paper can be executed using:
 ```
 # Example for running the SAIA experiment with HH-VAEM on Boston dataset
@@ -66,6 +73,9 @@ python active_learning_plots.py --models VAEM HHVAEM --dataset boston
 # Example for running the OoD experiment using MNIST and Fashion-MNIST as OoD:
 python ood.py --model HHVAEM --dataset mnist --dataset_ood fashion_mnist --split 0
 ```
+
+### Help
+Use the <code>--help</code> option for documentation on the usage of any of the mentioned scripts. 
 
 ## Contributors
 [Ignacio Peis](http://www.tsc.uc3m.es/~ipeis/index.html) <br>
