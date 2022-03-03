@@ -36,8 +36,13 @@ The following datasets are available:
 - A total of 10 UCI datasets: <code>avocado</code>, <code>boston</code>, <code>energy</code>, <code>wine</code>, <code>diabetes</code>, <code>concrete</code>, <code>naval</code>, <code>yatch</code>, <code>bank</code> or <code>insurance</code>.
 - The MNIST datasets: <code>mnist</code> or <code>fashion_mnist</code>.
 
-And also the following models:
+And also the following models (implemented in <code>src/models/</code>):
 - <code>HHVAEM</code>: the proposed model in the paper.
+- <code>VAEM</code>: the VAEM strategy presented in [(Ma et al., 2020)](https://arxiv.org/pdf/2006.11941.pdf) with Gaussian encoder (without including the
+Partial VAE).
+- <code>HVAEM</code>: A Hierarchical VAEM with two layers of latent variables and a Gaussian encoder.
+- <code>HMCVAEM</code>: A VAEM that includes a tuned HMC sampler for the true posterior.
+- For MNIST datasets (non heterogeneous data), use <code>HHVAE</code>, <code>VAE</code>, <code>HVAE</code> and <code>HMCVAE</code>.
 - 
 By default, the test stage will run at the end of the training stage. This can be cancelled with <code>--test 0</code> for manually running the test using:
 ```
