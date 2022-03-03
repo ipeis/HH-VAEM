@@ -1,4 +1,11 @@
 
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#  Copyright (c) 2022 by Ignacio Peis, UC3M.                                    +
+#  All rights reserved. This file is part of the HH-VAEM, and is released under +
+#  the "MIT License Agreement". Please see the LICENSE file that should have    +
+#  been included as part of this package.                                       +
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 from torch import nn
 
 def get_arch(dim_x: int, dim_y: int, latent_dim: int, arch_name='base', categories_x=1, categories_y=1, dim_h=256):
