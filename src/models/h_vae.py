@@ -88,7 +88,7 @@ class HierarchicalEncoder(nn.Module):
     """
     Implements a Hierarchical Encoder
     """
-    def __init__(self, dim_x: int, dim_y: int,  latent_dims: list, dims_h: int=256, balance_kl_steps: float=2e3, anneal_kl_steps: float=1e3):
+    def __init__(self, dim_x: int, dim_y: int,  latent_dims: list, dims_h: int=256, input_encoder: nn.Module = None, balance_kl_steps: float=2e3, anneal_kl_steps: float=1e3):
         """
         Encoder initialization
         
@@ -97,6 +97,7 @@ class HierarchicalEncoder(nn.Module):
             dim_y (int): dimension of the target.
             latent_dims (list): list of ints containing the latent dimension at each layer. First element corresponds to the shallowest layer, connected to the data.
             dims_h (int, optional): number of units for hidden vectors. Defaults to 256.
+            input_encoder(nn.Module, optional): specific encoder architecture, leave None for using MLP. Defaults to None.
             balance_kl_steps (float, optional): number of steps for balancing the KL terms of the different layers. Defaults to 2e3.
             anneal_kl_steps (float, optional): number of steps for annealing the KL. Defaults to 1e3.
         """
@@ -109,15 +110,18 @@ class HierarchicalEncoder(nn.Module):
         self.balance_kl_steps=balance_kl_steps
         self.anneal_kl_steps=anneal_kl_steps
         self.dims_r = [2*dim_x + 2*dim_y] + [dims_h] * len(latent_dims)
+        if input_encoder == None:
+            self.input_encoder = nn.Sequential(nn.Linear(2*dim_x + 2*dim_y, self.dims_r[1]))
+        else: self.input_encoder = input_encoder
         
         # NNs for computing deltas on the z parameters
         self.encoders = nn.ModuleList([
             nn.Linear(self.dims_r[l+1], 2 * latent_dims[l]) for l in range(len(latent_dims))])
 
-        self.NNs_r = nn.ModuleList([
+        self.NNs_r = nn.ModuleList([self.input_encoder] + [
             nn.Sequential(nn.Linear(self.dims_r[l], self.dims_r[l+1]), 
             nn.ReLU()) 
-            for l in range(len(latent_dims))]
+            for l in range(1, len(latent_dims))]
             )
 
         self.logvar = torch.nn.ParameterList([torch.nn.Parameter(torch.zeros(l)) for l in latent_dims])
@@ -282,8 +286,10 @@ class HVAE(BaseVAE):
         self.latent_dims = latent_dims
         self.layers = len(latent_dims)        
 
+        input_encoder, _, _ = get_arch(dim_x, dim_y, int(dim_h/2), arch, 1, categories_y, dim_h)   # use dim_h/2 here as latent dim because we have an extra MLP for encoding to z
+
         self.prior = HierarchicalPrior(latent_dims, dim_h)
-        self.encoder = HierarchicalEncoder(dim_x, dim_y, latent_dims, dim_h, 
+        self.encoder = HierarchicalEncoder(dim_x, dim_y, latent_dims, dim_h, input_encoder, 
             balance_kl_steps=balance_kl_steps, anneal_kl_steps=anneal_kl_steps)
 
         # collect all norm params in Linear layers
@@ -605,5 +611,5 @@ class HVAE(BaseVAE):
     # ============= Modified PL functions ============= #
     def configure_optimizers(self):
         opt = torch.optim.Adam(list(self.decoder.parameters()) + list(self.predictor.parameters()) + list(self.prior.parameters()) +
-                                   list(self.encoder.parameters()), lr=self.lr, weight_decay=0.01)    
+                                   list(self.encoder.parameters()), lr=self.lr)    
         return [opt]

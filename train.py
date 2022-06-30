@@ -19,7 +19,7 @@ parser.add_argument('--dataset', type=str, default='boston',
                     help='dataset to train (boston, mnist, ...)')
 parser.add_argument('--split', type=int, default=0,
                     help='train/test split index to use (default splits: 0, ..., 9)')
-parser.add_argument('--version', type=str, default=None, 
+parser.add_argument('--version', type=str, default='version_0', 
                     help='name for the log in Tensorboard (defaul None for "version_0")')
 parser.add_argument('--test', type=int, default=1, 
                     help='testing at training end (1) or not (0)')   
@@ -35,9 +35,11 @@ device = torch.device("cuda" if args.cuda else "cpu")
 if str(device) == "cuda":
     print('cuda activated')
 
-
-model_name = args.dataset + '/' + args.model + '/' + 'split_' + str(args.split)
+model_name = clean_dataset(args.dataset) + '/' + args.model + '/' + 'split_' + str(args.split)
+args.model = clean_model(args.model)
 config = get_config(args.model, args.dataset)
+args.dataset = clean_dataset(args.dataset)      # for extracting 'fashion_mnist' from 'fashion_mnist_cnn'
+
 config['split_idx'] = args.split
 epochs = config['epochs']
 config.pop('epochs')

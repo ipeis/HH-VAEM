@@ -22,8 +22,8 @@ parser.add_argument('--model', type=str, default='HHVAEM',
                     help='model to use (VAE, HVAE, HMCVAE, HHVAE, VAEM, HVAEM, HMCVAEM, HHVAEM)')
 parser.add_argument('--dataset', type=str, default='boston',
                     help='dataset to train (boston, mnist, ...)')
-parser.add_argument('--version', type=str, default=None,
-                    help='name for the log in Tensorboard (defaul None for "version_0")')
+parser.add_argument('--version', type=str, default='version_0',
+                    help='name for the log in Tensorboard (default  "version_0")')
 parser.add_argument('--load', type=int, default=1,
                     help='For loading pre computed split results (1) or computing first (0)')
 parser.add_argument('--gpu', type=int, default=1,
@@ -40,7 +40,7 @@ if __name__ == '__main__':
             os.system("python test.py --dataset {:s} --model {:s} --version {:s} --split {:d} --gpu {:d}".format(args.dataset, args.model, args.version, s, args.gpu))
 
     metrics_splits = [np.load(ckpt_path.split('checkpoints', 1)[0] + 'test_metrics.npy', allow_pickle=True).tolist() for s, ckpt_path in enumerate(ckpt_paths)]
-
+    
     metrics = {
             'll_y': [],
             'll_xu': [],
@@ -50,6 +50,7 @@ if __name__ == '__main__':
     for key in metrics.keys():
         metrics[key] = np.concatenate([m[key][np.newaxis] for m in metrics_splits], axis=0)
     
+    print(metrics)
     metrics_final = {
         'mean_ll_y': metrics['ll_y'].mean(axis=0),
         'std_ll_y': metrics['ll_y'].std(axis=0),

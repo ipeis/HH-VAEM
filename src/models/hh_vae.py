@@ -314,6 +314,7 @@ class HHVAE(HVAE):
         """
         
         if hmc==False or self.validation and self.global_step < self.pre_steps:
+        #if self.global_step < self.pre_steps or self.training==False:
             mus = [m.repeat(samples, 1, 1).permute(1, 0, 2) for m in mus]
             logvars = [l.repeat(samples, 1, 1).permute(1, 0, 2) for l in logvars]
             # Gaussian approx
@@ -414,11 +415,11 @@ class HHVAE(HVAE):
     # ============= Modified PL functions ============= #
     def configure_optimizers(self):
         opt_vae = torch.optim.Adam(list(self.decoder.parameters()) + list(self.predictor.parameters()) + list(self.prior.parameters()) +
-                                   list(self.encoder.parameters()), lr=self.lr_pre, weight_decay=0.01)
-        opt_decoder = torch.optim.Adam(list(self.decoder.parameters()), lr=self.lr_decoder, weight_decay=0.01)
-        opt_prior = torch.optim.Adam(list(self.prior.parameters()), lr=self.lr_prior, weight_decay=0.01)
-        opt_predictor = torch.optim.Adam(list(self.predictor.parameters()), lr=self.lr_predictor, weight_decay=0.01)
-        opt_encoder = torch.optim.Adam(list(self.encoder.parameters()), lr=self.lr_encoder, weight_decay=0.01)
+                                   list(self.encoder.parameters()), lr=self.lr_pre)
+        opt_decoder = torch.optim.Adam(list(self.decoder.parameters()), lr=self.lr_decoder)
+        opt_prior = torch.optim.Adam(list(self.prior.parameters()), lr=self.lr_prior)
+        opt_predictor = torch.optim.Adam(list(self.predictor.parameters()), lr=self.lr_predictor)
+        opt_encoder = torch.optim.Adam(list(self.encoder.parameters()), lr=self.lr_encoder)
         opt_hmc = torch.optim.Adam([self.HMC.log_eps], lr=self.lr_hmc)
         opt_scale = torch.optim.Adam([self.HMC.log_inflation], lr=self.lr_scale)
 

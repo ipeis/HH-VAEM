@@ -7,14 +7,26 @@
 
 from typing import Dict
 from src.models.base import *
+from src.models.miwae import *
 from src.models.hmc_vae import *
 from src.models.h_vae import *
 from src.models.hh_vae import *
 from src.models.vaem import *
+from src.models.miwaem import *
 from src.models.hmc_vaem import *
 from src.models.h_vaem import *
 from src.models.hh_vaem import *
 from src.configs import *
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import GridSearchCV
+from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
+from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+from sklearn.svm import SVR, SVC
+from sklearn.neural_network import MLPRegressor, MLPClassifier
+
+
 
 def create_model(model: str, config: Dict) -> object:
     """
@@ -29,6 +41,8 @@ def create_model(model: str, config: Dict) -> object:
     """
     if model=='VAE':
         model = BaseVAE(**config)
+    elif model=='MIWAE':
+        model = MIWAE(**config) 
     elif model=='HMCVAE':
         model = HMCVAE(**config)
     elif model=='HVAE':
@@ -37,12 +51,50 @@ def create_model(model: str, config: Dict) -> object:
         model = HHVAE(**config) 
     elif model=='VAEM':
         model = VAEM(**config)
+    elif model=='MIWAEM':
+        model = MIWAEM(**config) 
     elif model=='HMCVAEM':
         model = HMCVAEM(**config)
     elif model=='HVAEM':
         model = HVAEM(**config)
     elif model=='HHVAEM':
-        model = HHVAEM(**config) 
+        model = HHVAEM(**config)
+
+    # ============= SKLEARN ============= #
+
+    elif model=='KNeighborsRegressor':
+        pipe = Pipeline([('scaler', StandardScaler()), ('model', KNeighborsRegressor())])
+        params_pipe_knn = config
+        model = GridSearchCV(pipe, param_grid=params_pipe_knn, cv=3)
+    elif model=='KNeighborsClassifier':
+        pipe = Pipeline([('scaler', StandardScaler()), ('model', KNeighborsClassifier())])
+        params_pipe_knn = config
+        model = GridSearchCV(pipe, param_grid=params_pipe_knn, cv=3)
+    elif model=='RandomForestRegressor':
+        pipe = Pipeline([('scaler', StandardScaler()), ('model', RandomForestRegressor())])
+        params_pipe_knn = config
+        model = GridSearchCV(pipe, param_grid=params_pipe_knn, cv=3)
+    elif model=='RandomForestClassifier':
+        pipe = Pipeline([('scaler', StandardScaler()), ('model', RandomForestClassifier())])
+        params_pipe_knn = config
+        model = GridSearchCV(pipe, param_grid=params_pipe_knn, cv=3)
+    elif model=='SVR':
+        pipe = Pipeline([('scaler', StandardScaler()), ('model', SVR())])
+        params_pipe_knn = config
+        model = GridSearchCV(pipe, param_grid=params_pipe_knn, cv=3)
+    elif model=='SVC':
+        pipe = Pipeline([('scaler', StandardScaler()), ('model', SVC())])
+        params_pipe_knn = config
+        model = GridSearchCV(pipe, param_grid=params_pipe_knn, cv=3)
+    elif model=='MLPRegressor':
+        pipe = Pipeline([('scaler', StandardScaler()), ('model', MLPRegressor())])
+        params_pipe_knn = config
+        model = GridSearchCV(pipe, param_grid=params_pipe_knn, cv=3)
+    elif model=='MLPClassifier':
+        pipe = Pipeline([('scaler', StandardScaler()), ('model', MLPClassifier())])
+        params_pipe_knn = config
+        model = GridSearchCV(pipe, param_grid=params_pipe_knn, cv=3)
+
     return model
 
 def load_model(model: str, path: str, device: str) -> object:
@@ -60,6 +112,8 @@ def load_model(model: str, path: str, device: str) -> object:
 
     if model=='VAE':
         model = BaseVAE.load_from_checkpoint(path, device=device).eval().to(device)
+    elif model=='MIWAE':
+        model = MIWAE.load_from_checkpoint(path, device=device).eval().to(device)
     elif model=='HMCVAE':
         model = HMCVAE.load_from_checkpoint(path, device=device).eval().to(device)
     elif model=='HVAE':
@@ -68,6 +122,8 @@ def load_model(model: str, path: str, device: str) -> object:
         model = HHVAE.load_from_checkpoint(path, device=device).eval().to(device)
     elif model=='VAEM':
         model = VAEM.load_from_checkpoint(path, device=device).eval().to(device)
+    elif model=='MIWAEM':
+        model = MIWAEM.load_from_checkpoint(path, device=device).eval().to(device)
     elif model=='HMCVAEM':
         model = HMCVAEM.load_from_checkpoint(path, device=device).eval().to(device)
     elif model=='HVAEM':
@@ -110,9 +166,27 @@ def find_splits_models(dataset: str, model: str, version="version_0") -> list:
     """
     models = []
     for split in range(SPLITS):
-        path = '{:s}logs/{:s}/{:s}/split_{:d}/{:s}/checkpoints'.format(LOGDIR, dataset, model, split, version)
+        path = '{:s}/logs/{:s}/{:s}/split_{:d}/{:s}/checkpoints'.format(LOGDIR, dataset, model, split, version)
         ckpts = os.listdir(path)
         ckpts = [ckpt for ckpt in ckpts  if not ckpt.__contains__('test')]
         models.append(os.path.join(path, ckpts[0]))
 
     return models
+
+def clean_model(model: str):
+    """Returns the clean name of a model.
+    Given HHVAE_cnn, it returns HHVAE
+
+    Args:
+        dataset (str): name with '_' as separator
+
+    Returns:
+        str: clean name
+    """
+    sep = model.split('_')
+    # If the dataset name itsel contains '_'
+    if len(sep)>1:
+        clean = '_'.join(model.split('_')[:-1])  # fashion_mnist_cnn -> fashion_mnist
+    else:
+        clean = model.split('_')[0]
+    return clean

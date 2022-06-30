@@ -315,7 +315,7 @@ class BaseVAE(pl.LightningModule):
         self.validation=False
 
         self.save_hyperparameters('dim_x', 'dim_y', 'likelihood_x', 'likelihood_y', 'variance', 'imbalanced_y', 'categories_y',
-             'latent_dim', 'arch', 'batch_size', 'lr', 'dim_h', 'samples_MC', 'dataset', 'data_path')
+        'prediction_metric', 'latent_dim', 'arch', 'batch_size', 'lr', 'dim_h', 'samples_MC', 'dataset', 'data_path')
 
         # call train_dataloader to store the means and stds for scaling
         self.train_dataloader()

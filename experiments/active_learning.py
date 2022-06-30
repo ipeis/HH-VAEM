@@ -37,6 +37,7 @@ if str(device) == "cuda":
     print('cuda activated')
 
 config = configs_active_learning[args.dataset]
+args.dataset = clean_dataset(args.dataset)
 samples = config['samples']
 bins = config['bins']
 step = config['step']
@@ -48,6 +49,7 @@ if __name__ == '__main__':
 
         results = []
         ckpt_path = find_path(args.dataset, args.model, args.split, args.version)
+        args.model = clean_model(args.model)
         model = load_model(args.model, ckpt_path, device).eval()
         
         mixed = None

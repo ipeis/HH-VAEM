@@ -24,6 +24,8 @@ colors = list(mcolors.TABLEAU_COLORS)
 parser = argparse.ArgumentParser(description='OoD experiment')
 parser.add_argument('--model', type=str, default='HHVAEM',
                     help='model to use (VAE, HVAE, HMCVAE, HHVAE, VAEM, HVAEM, HMCVAEM, HHVAEM)')
+parser.add_argument('--version', type=str, default='version_0', 
+                    help='name for the log in Tensorboard (defaul None for "version_0")')
 parser.add_argument('--dataset', type=str, default='boston',
                     help='dataset to train (boston, mnist, ...)')
 parser.add_argument('--dataset_ood', type=str, default="fashion_mnist",
@@ -39,6 +41,8 @@ args = parser.parse_args()
 args.cuda = args.gpu and torch.cuda.is_available()
 args.cuda = args.cuda == True and torch.cuda.is_available()
 device = torch.device("cuda" if args.cuda else "cpu")
+args.dataset = clean_dataset(args.dataset)
+
 if str(device) == "cuda":
     print('cuda activated')
 
@@ -48,7 +52,8 @@ if __name__ == '__main__':
         f = plt.figure()
 
         results = []
-        ckpt_path = find_path(args.dataset, args.model,args.split,  'version_0')
+        ckpt_path = find_path(args.dataset, args.model, args.split, args.version)
+        args.model = clean_model(args.model)
         model = load_model(args.model, ckpt_path, device=device).eval()
 
         mixed = None

@@ -42,10 +42,11 @@ if __name__ == '__main__':
         
         # ============= TEST ============= #
         print('Testing a {:s} on split {:d} of {:s}'.format(args.model, args.split, args.dataset))
+        args.dataset = clean_dataset(args.dataset)      # for extracting 'fashion_mnist' from 'fashion_mnist_cnn'
         ckpt_path = find_path(args.dataset, args.model,args.split, args.version)
-
+        model_name = args.dataset + '/' + args.model + '/' + 'split_' + str(args.split)
+        args.model = clean_model(args.model)
         model = load_model(args.model, ckpt_path, device)
-        model_name = model.dataset + '/' + args.model + '/' + 'split_' + str(args.split)
 
         trainer = pl.Trainer(
             gpus=args.gpu,

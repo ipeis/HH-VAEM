@@ -716,6 +716,7 @@ class View(nn.Module):
 
 # ============= Dataloaders ============= #
 def get_dataset_loader(dataset: str, split='train', path='../data/', batch_size=128, num_workers=4, **kwargs) -> MultiEpochsDataLoader:
+
     """
     Function that maps datasets into loaders
 
@@ -846,7 +847,7 @@ def get_dataset_loader(dataset: str, split='train', path='../data/', batch_size=
                             dim=dim, mixed=mixed)
             loader = MultiEpochsDataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=True)
         elif split=='test':
-            data = Insurance(root=path + 'insurance/', download=True, train=True,
+            data = Insurance(root=path + 'insurance/', download=True, train=False,
                             transform=transforms.ToTensor(), split_idx=kwargs['split_idx'],
                             dim=dim, mixed=mixed)
             loader = MultiEpochsDataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=False, )
@@ -890,3 +891,25 @@ def get_dataset_loader(dataset: str, split='train', path='../data/', batch_size=
                             dim=dim, mixed=mixed)
             loader = MultiEpochsDataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=False,)
         return loader
+
+
+
+def clean_dataset(dataset: str):
+    """Returns the clean name of a dataset.
+    Given fashion_mnist_cnn, it returns fashion_mnist
+
+    Args:
+        dataset (str): name with '_' as separator
+
+    Returns:
+        str: clean name
+    """
+    sep = dataset.split('_')
+    # If the dataset name itsel contains '_'
+    if len(sep)>1 and dataset != 'fashion_mnist':
+        clean = '_'.join(dataset.split('_')[:-1])  # mnist_cnn -> mnist
+    elif len(sep)>2 and dataset == 'fashion_mnist':
+        clean = 'fashion_mnist'
+    else:
+        clean = dataset
+    return clean

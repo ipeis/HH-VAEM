@@ -17,7 +17,7 @@ class HMC(nn.Module):
     """
     Implements an HMC sampler with trainable hyperparameters
     """
-    def __init__(self, dim: int, logp: Callable, T: int=30,  L: int=5, chains: int=1, chains_sksd: int=30, scale_per_layer=True):
+    def __init__(self, dim: int, logp: Callable, T: int=30,  L: int=5, chains: int=1, chains_sksd: int=30, scale_per_layer=None):
         """
         HMC initialization
 
@@ -28,7 +28,7 @@ class HMC(nn.Module):
             L (int, optional): number of Leapfrog steps. Defaults to 5.
             chains (int, optional): number of parallel HMC chains. Defaults to 1.
             chains_sksd (int, optional): number of parallel HMC chains for computing the SKSD. Defaults to 30.
-            scale_per_layer (bool, optional): learn a scale parameter per layer in the Hierarchy (True) or a scalar value (False). Defaults to None.
+            scale_per_layer (bool, optional): learn a scale parameter per layer in the Hierarchy (input a list with the sizes) or a scalar value (None). Defaults to None.
         """
         super().__init__()
 
