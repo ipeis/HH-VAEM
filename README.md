@@ -9,11 +9,13 @@ This repository contains the official Pytorch implementation of the Hierarchical
 
 Please, if you use this code, cite the [preprint](https://arxiv.org/pdf/2202.04599.pdf) using:
 ```
-@article{peis2022missing,
+@inproceedings{peis2022missing,
+  abbr={NeurIPS}, 
   title={Missing Data Imputation and Acquisition with Deep Hierarchical Models and Hamiltonian Monte Carlo},
   author={Peis, Ignacio and Ma, Chao and Hern{\'a}ndez-Lobato, Jos{\'e} Miguel},
-  journal={arXiv preprint arXiv:2202.04599},
-  year={2022}
+  booktitle={Advances in Neural Information Processing Systems},
+  volume={35},
+  year={2022},
 }
 ```
 
