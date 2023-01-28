@@ -21,9 +21,7 @@ parser.add_argument('--dataset', type=str, default='celeba',
 parser.add_argument('--split', type=int, default=0,
                     help='train/test split index to use (default splits: 0, ..., 9)')
 parser.add_argument('--version', type=str, default='version_0', 
-                    help='name for the log in Tensorboard (defaul None for "version_0")')
-parser.add_argument('--method', type=str, default="mi",
-                    help='method to use for Information Reward (mi or kl)')  
+                    help='name for the log in Tensorboard (defaul None for "version_0")')  
 parser.add_argument('--set', type=str, default='test',
                     help='train or test set')
 parser.add_argument('--gpu', type=int, default=1,
