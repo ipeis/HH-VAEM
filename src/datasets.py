@@ -20,6 +20,12 @@ from torch import nn
 import pandas as pd
 from sklearn.model_selection import KFold
 import zipfile
+from torch.utils.data.dataloader import DataLoader
+from torchvision.datasets.celeba import CelebA
+import PIL
+from typing import Any, Callable, List, Optional, Union, Tuple
+from functools import partial
+
 
 # Number of splits per dataset
 global SPLITS 
@@ -655,6 +661,135 @@ class FashionMNIST(BaseDataset):
 
 
 
+class MyCelebA(CelebA):
+
+    def __init__(self, root='data/celeba/', name='celeba', train=True, 
+                transform=None, 
+                download=False, test_missing_rate=0.5, split_idx=0, dim_y=40):
+
+        #split_ = 'train' if train==True else 'test'
+        transform =  torchvision.transforms.Compose([
+            torchvision.transforms.ToTensor(),
+            transforms.CenterCrop(148),
+            transforms.Resize((64,64))])
+
+        super(MyCelebA, self).__init__(root=root, split='train', transform=transform, 
+            target_type='attr', download=False)
+        """
+        Initialization of the Dataset
+
+        Args:
+            root (str, optional): Root directory. Defaults to 'data/'.
+            name (str, optional): Name of the dataset. Defaults to 'dataset'.
+            train (bool, optional): Train (True) or Test (False) set. Defaults to True.
+            transform (_type_, optional): Transformation to be applied. Defaults to None.
+            download (bool, optional): Download (True) if necessary. Defaults to False.
+            test_missing_rate (float, optional): rate for fixed test missing data. Defaults to 0.5.
+            split_idx (int, optional): split index (can be 0, ..., SPLITS). Defaults to 0.
+            dim (_type_, int): dimension (column) to extract. Defaults to None (full matrix).
+            mixed (bool, optional): preprocessing as mixed-type (True) or Gaussian (False) data. Defaults to False.
+            dim_y (int, optional): dimension of the target. Defaults to 1.
+        """
+
+        self.root = os.path.expanduser(root + '{:s}/'.format(name))
+        self.train = train 
+        self.dim_y = dim_y
+        self.test_missing_rate = test_missing_rate
+        self.split_idx = split_idx
+
+        if not self._check_exists():
+            self.split_dataset()
+
+        
+        self.observed = np.load(self.root + 'observed_{}.npy'.format(split_idx))
+        
+        fn = partial(os.path.join, self.root)
+        splits = pd.read_csv(fn("split_idx_{}.csv".format(split_idx)), header=None, index_col=0)
+
+        mask = slice(None) if split_idx is None else (splits[1] == split_idx)
+    
+        self.filename = splits[mask].index.values
+    
+    def __getitem__(self, index: int) -> Tuple[Any, Any]:
+        X = PIL.Image.open(os.path.join(self.root, "img_align_celeba", self.filename[index]))
+
+        target: Any = []
+        for t in self.target_type:
+            if t == "attr":
+                target.append(self.attr[index, :])
+            elif t == "identity":
+                target.append(self.identity[index, 0])
+            elif t == "bbox":
+                target.append(self.bbox[index, :])
+            elif t == "landmarks":
+                target.append(self.landmarks_align[index, :])
+            else:
+                # TODO: refactor with utils.verify_str_arg
+                raise ValueError("Target type \"{}\" is not recognized.".format(t))
+
+        if self.transform is not None:
+            X = self.transform(X)
+
+        if target:
+            target = tuple(target) if len(target) > 1 else target[0]
+
+            if self.target_transform is not None:
+                target = self.target_transform(target)
+        else:
+            target = None
+
+        X = X.view(3*64**2)
+        
+        if self.train:
+            missing_rate = np.random.rand(1) * 0.99
+            observed_target = (np.random.rand(target.shape[0]) > missing_rate)
+            observed_x = (np.random.rand(X.shape[0]) > missing_rate)
+        else:
+            observed_target = target * 0 # in test we do not observe any label
+            observed_x = self.observed[index]
+
+        return X, observed_x, target, observed_target
+
+    def __len__(self):
+        return len(self.filename)
+
+    def split_dataset(self, nsplits:int=SPLITS):
+        """
+        Partinionate the dataset in SPLITS number of splits, save splits in the root folder, create artificial observation mask
+
+        Args:
+            nsplits (_type_, optional): number of splits. Defaults to SPLITS.
+        """
+
+        fn = partial(os.path.join, self.root)
+        split_idx = pd.read_csv(fn("list_eval_partition.txt"), delim_whitespace=True, header=None, index_col=0)
+        kf = KFold(n_splits=nsplits, shuffle=True)
+        s=0
+        for train_index, test_index in kf.split(np.arange(self.__len__())[:, np.newaxis]):
+
+            split_idx[1].iloc[train_index] = 0
+            split_idx[1].iloc[test_index] = 1
+            
+            split_idx.to_csv(self.root + 'split_idx_{}.csv'.format(s))
+
+            observed = (np.random.rand(len(test_index), 1, 64**2) > self.test_missing_rate)
+            observed = np.tile(observed, (1, 3 ,1))
+            observed = observed.reshape(-1, 3*64**2)
+            np.save(self.root + 'observed_{}'.format(s), observed)
+
+            s+=1
+        print('Done!')
+
+    def _check_exists(self) -> bool:
+        """
+        Check if dataset exists
+
+        Returns:
+            (bool): True if the dataset is already in the root folder
+        """
+        return os.path.exists(os.path.join(self.root, 'split_idx_0.csv'))
+
+
 
 
 
@@ -715,7 +850,7 @@ class View(nn.Module):
 
 
 # ============= Dataloaders ============= #
-def get_dataset_loader(dataset: str, split='train', path='../data/', batch_size=128, num_workers=4, **kwargs) -> MultiEpochsDataLoader:
+def get_dataset_loader(dataset: str, split='train', path='../data/', batch_size=128, num_workers=8, **kwargs) -> DataLoader:
 
     """
     Function that maps datasets into loaders
@@ -728,7 +863,7 @@ def get_dataset_loader(dataset: str, split='train', path='../data/', batch_size=
         num_workers (int, optional): _description_. Defaults to 4.
 
     Returns:
-        (MultiEpochsDataLoader): train/test dataloader
+        (DataLoader): train/test dataloader
     """
 
     dim = kwargs['dim'] if 'dim' in kwargs else None
@@ -752,14 +887,14 @@ def get_dataset_loader(dataset: str, split='train', path='../data/', batch_size=
             data = Energy(root=path + 'energy/', download=True, train=True,
                             transform=transforms.ToTensor(),
                             split_idx=kwargs['split_idx'], dim=dim, mixed=mixed)
-            loader = MultiEpochsDataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=True)
+            loader = DataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=True)
 
-            loader = MultiEpochsDataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=False)
+            loader = DataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=False)
         elif split=='test':
             data = Energy(root=path + 'energy/', download=True, train=False,
                             transform=transforms.ToTensor(),
                             split_idx=kwargs['split_idx'], dim=dim, mixed=mixed)
-            loader = MultiEpochsDataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=False)
+            loader = DataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=False)
         return loader
 
     if dataset == 'wine':
@@ -767,12 +902,12 @@ def get_dataset_loader(dataset: str, split='train', path='../data/', batch_size=
             data = Wine(root=path + 'wine/', download=True, train=True,
                             transform=transforms.ToTensor(),
                             split_idx=kwargs['split_idx'], dim=dim, mixed=mixed)
-            loader = MultiEpochsDataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=True)
+            loader = DataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=True)
         elif split=='test':
             data = Wine(root=path + 'wine/', download=True, train=False,
                             transform=transforms.ToTensor(),
                             split_idx=kwargs['split_idx'], dim=dim, mixed=mixed)
-            loader = MultiEpochsDataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=False, )
+            loader = DataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=False, )
         return loader
 
     if dataset == 'diabetes':
@@ -780,12 +915,12 @@ def get_dataset_loader(dataset: str, split='train', path='../data/', batch_size=
             data = Diabetes(root=path + 'diabetes/', download=True, train=True,
                                         transform=transforms.ToTensor(), split_idx=kwargs['split_idx'],
                                         dim=dim, mixed=mixed)
-            loader = MultiEpochsDataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=True)
+            loader = DataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=True)
         elif split=='test':
             data = Diabetes(root=path + 'diabetes/', download=True, train=False,
                                 transform=transforms.ToTensor(), split_idx=kwargs['split_idx'],
                                 dim=dim, mixed=mixed)
-            loader = MultiEpochsDataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=False)
+            loader = DataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=False)
         return loader
         
     if dataset == 'avocado':
@@ -793,12 +928,12 @@ def get_dataset_loader(dataset: str, split='train', path='../data/', batch_size=
             data = Avocado(root=path + 'avocado/', download=True, train=True,
                                         transform=transforms.ToTensor(), split_idx=kwargs['split_idx'],
                                         dim=dim, mixed=mixed)
-            loader = MultiEpochsDataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=True)
+            loader = DataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=True)
         elif split=='test':
             data = Avocado(root=path + 'avocado/', download=True, train=False,
                                 transform=transforms.ToTensor(), split_idx=kwargs['split_idx'],
                                 dim=dim, mixed=mixed)
-            loader = MultiEpochsDataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=False)
+            loader = DataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=False)
         return loader
 
     if dataset == 'concrete':
@@ -806,12 +941,12 @@ def get_dataset_loader(dataset: str, split='train', path='../data/', batch_size=
             data = Concrete(root=path + 'concrete/', download=True, train=True,
                             transform=transforms.ToTensor(), split_idx=kwargs['split_idx'],
                             dim=dim, mixed=mixed)
-            loader = MultiEpochsDataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=True)
+            loader = DataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=True)
         elif split=='test':
             data = Concrete(root=path + 'concrete/', download=True, train=False,
                             transform=transforms.ToTensor(), split_idx=kwargs['split_idx'],
                             dim=dim, mixed=mixed)
-            loader = MultiEpochsDataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=False, )
+            loader = DataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=False, )
         return loader
 
     if dataset == 'naval':
@@ -819,12 +954,12 @@ def get_dataset_loader(dataset: str, split='train', path='../data/', batch_size=
             data = Naval(root=path + 'naval/', download=True, train=True,
                             transform=transforms.ToTensor(), split_idx=kwargs['split_idx'],
                             dim=dim, mixed=mixed)
-            loader = MultiEpochsDataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=True, pin_memory=True)
+            loader = DataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=True, pin_memory=True)
         elif split=='test':
             data = Naval(root=path + 'naval/', download=True, train=False,
                             transform=transforms.ToTensor(), split_idx=kwargs['split_idx'],
                             dim=dim, mixed=mixed)
-            loader = MultiEpochsDataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=False, pin_memory=True)
+            loader = DataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=False, pin_memory=True)
         return loader
 
     if dataset == 'yatch':
@@ -832,12 +967,12 @@ def get_dataset_loader(dataset: str, split='train', path='../data/', batch_size=
             data = Yatch(root=path + 'yatch/', download=True, train=True,
                             transform=transforms.ToTensor(), split_idx=kwargs['split_idx'],
                             dim=dim, mixed=mixed)
-            loader = MultiEpochsDataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=True)
+            loader = DataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=True)
         elif split=='test':
             data = Yatch(root=path + 'yatch/', download=True, train=False,
                             transform=transforms.ToTensor(), split_idx=kwargs['split_idx'],
                             dim=dim, mixed=mixed)
-            loader = MultiEpochsDataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=False, )
+            loader = DataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=False, )
         return loader
         
     if dataset == 'insurance':
@@ -845,12 +980,12 @@ def get_dataset_loader(dataset: str, split='train', path='../data/', batch_size=
             data = Insurance(root=path + 'insurance/', download=True, train=True,
                             transform=transforms.ToTensor(), split_idx=kwargs['split_idx'],
                             dim=dim, mixed=mixed)
-            loader = MultiEpochsDataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=True)
+            loader = DataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=True)
         elif split=='test':
             data = Insurance(root=path + 'insurance/', download=True, train=False,
                             transform=transforms.ToTensor(), split_idx=kwargs['split_idx'],
                             dim=dim, mixed=mixed)
-            loader = MultiEpochsDataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=False, )
+            loader = DataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=False, )
         return loader
 
     if dataset == 'bank':
@@ -858,12 +993,12 @@ def get_dataset_loader(dataset: str, split='train', path='../data/', batch_size=
             data = Bank(root=path + 'bank/', download=True, train=True,
                             transform=transforms.ToTensor(), split_idx=kwargs['split_idx'],
                             dim=dim, mixed=mixed)
-            loader = MultiEpochsDataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=True)
+            loader = DataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=True)
         elif split=='test':
             data = Bank(root=path + 'bank/', download=True, train=False,
                             transform=transforms.ToTensor(), split_idx=kwargs['split_idx'],
                             dim=dim, mixed=mixed)
-            loader = MultiEpochsDataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=False, )
+            loader = DataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=False, )
         return loader
 
     if dataset == 'mnist':
@@ -871,12 +1006,12 @@ def get_dataset_loader(dataset: str, split='train', path='../data/', batch_size=
             data = MNIST(root=path + 'mnist/', download=True, train=True,
                             transform=transforms.ToTensor(), split_idx=kwargs['split_idx'],
                             dim=dim, mixed=mixed)
-            loader = MultiEpochsDataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=True,)
+            loader = DataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=True,)
         elif split=='test':
             data = MNIST(root=path + 'mnist/', download=True, train=False,
                             transform=transforms.ToTensor(), split_idx=kwargs['split_idx'],
                             dim=dim, mixed=mixed)
-            loader = MultiEpochsDataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=False,)
+            loader = DataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=False,)
         return loader
 
     if dataset == 'fashion_mnist':
@@ -884,12 +1019,21 @@ def get_dataset_loader(dataset: str, split='train', path='../data/', batch_size=
             data = FashionMNIST(root=path + 'fashion_mnist/', download=True, train=True,
                             transform=transforms.ToTensor(), split_idx=kwargs['split_idx'],
                             dim=dim, mixed=mixed)
-            loader = MultiEpochsDataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=True,)
+            loader = DataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=True,)
         elif split=='test':
             data = FashionMNIST(root=path + 'fashion_mnist/', download=True, train=False,
                             transform=transforms.ToTensor(), split_idx=kwargs['split_idx'],
                             dim=dim, mixed=mixed)
-            loader = MultiEpochsDataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=False,)
+            loader = DataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=False,)
+        return loader
+
+    if dataset == 'celeba':
+        if split=='train':
+            data = MyCelebA(root=path, download=False, train=True, split_idx=kwargs['split_idx'])
+            loader = DataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=True,)
+        elif split=='test':
+            data = MyCelebA(root=path, download=False, train=False, split_idx=kwargs['split_idx'])
+            loader = DataLoader(data, batch_size=batch_size, num_workers=num_workers, shuffle=False,)
         return loader
 
 

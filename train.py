@@ -9,17 +9,19 @@ from src import *
 from pytorch_lightning.loggers import TensorBoardLogger
 import argparse
 
+from src.callbacks import ImageCondSampler
+
 # ============= ARGS ============= #
 
 parser = argparse.ArgumentParser(description='Train the HH-VAEM model and baselines')
 
 parser.add_argument('--model', type=str, default='HHVAEM',
-                    help='model to use (VAE, HVAE, HMCVAE, HHVAE, VAEM, HVAEM, HMCVAEM, HHVAEM)')
+                    help='model to use (VAE, MIWAE, HVAE, HMCVAE, HHVAE, VAEM, MIWAEM, HVAEM, HMCVAEM, HHVAEM)')
 parser.add_argument('--dataset', type=str, default='boston', 
                     help='dataset to train (boston, mnist, ...)')
 parser.add_argument('--split', type=int, default=0,
                     help='train/test split index to use (default splits: 0, ..., 9)')
-parser.add_argument('--version', type=str, default='version_0', 
+parser.add_argument('--version', type=str, default=None, 
                     help='name for the log in Tensorboard (defaul None for "version_0")')
 parser.add_argument('--test', type=int, default=1, 
                     help='testing at training end (1) or not (0)')   
@@ -53,7 +55,12 @@ if __name__ == '__main__':
     print('Training a {:s} on split {:d} of {:s}'.format(args.model, args.split, args.dataset))
     trainer = pl.Trainer(
         max_epochs=epochs,
-        #callbacks=[plot2DEncodingsPointPred()],
+        #callbacks=[
+        #    ImageSampler(channels=3, size=64),
+        #    ImageReconstruction(channels=3, size=64),
+            #Inpainting(),
+            #ImageCondSampler()
+        #    ],
         gpus=args.gpu,
         default_root_dir='{}/logs/'.format(LOGDIR),
         logger=TensorBoardLogger(name=model_name, save_dir='{}/logs/'.format(LOGDIR), version=args.version),

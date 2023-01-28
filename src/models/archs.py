@@ -58,10 +58,65 @@ def get_arch(dim_x: int, dim_y: int, latent_dim: int, arch_name='base', categori
             nn.ConvTranspose2d(in_channels=32, out_channels=16, kernel_size=5, stride=2, padding=2, output_padding=1),
             nn.ReLU(),
             nn.ConvTranspose2d(in_channels=16, out_channels=1, kernel_size=5, stride=2, padding=2, output_padding=1),
-            View((-1, dim_x)),
+            #View((-1, dim_x)),
+            SplitDim(1, 1),
+            Flatten()
         )
         decoder = ConvDecoder(decoder_net)
         predictor = nn.Sequential(nn.Linear(latent_dim + 2*dim_x*categories_x, dim_h), nn.ReLU(), nn.Linear(dim_h, dim_y*categories_y))
+
+    if arch_name=='celeba':
+        # Convolutional Architecture for CelebA
+        encoder_net = nn.Sequential(
+            View((-1, 3, 64, 64)),
+            nn.Conv2d(3, 32, 4, 2, 1),           # B,  32, 32, 32
+            nn.BatchNorm2d(32),
+            nn.ReLU(True),
+            nn.Conv2d(32, 32, 4, 2, 1),                 # B,  32, 16, 16
+            nn.BatchNorm2d(32),
+            nn.ReLU(True),
+            nn.Conv2d(32, 64, 4, 2, 1),                 # B,  64,  8,  8
+            nn.BatchNorm2d(64),
+            nn.ReLU(True),
+            nn.Conv2d(64, 64, 4, 2, 1),                 # B,  64,  4,  4
+            nn.BatchNorm2d(64),
+            nn.ReLU(True),
+            nn.Conv2d(64, dim_h, 4, 1),                   # B, 256,  1,  1
+            nn.BatchNorm2d(dim_h),
+            nn.ReLU(True),
+        )
+        
+        decoder = nn.Sequential(
+            nn.Linear(latent_dim, dim_h),
+            View((-1, dim_h, 1, 1)),                      # B, 256,  1,  1
+            nn.BatchNorm2d(dim_h),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(dim_h, 64, 4),             # B,  64,  4,  4
+            nn.BatchNorm2d(64),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(64, 64, 4, 2, 1),        # B,  64,  8,  8
+            nn.BatchNorm2d(64),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(64, 32, 4, 2, 1),        # B,  32, 16, 16
+            nn.BatchNorm2d(32),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(32, 32, 4, 2, 1),        # B,  32, 32, 32
+            nn.BatchNorm2d(32),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(32, 3, 4, 2, 1),  # B, nc, 64, 64
+            #nn.Tanh(),
+            SplitDim(1, 3),
+            Flatten()
+        )
+
+        dim_hx = dim_h
+        encoder = ConvEncoderXY(dim_x, dim_hx, dim_y, encoder_net, dim_h, latent_dim, channels=3)
+
+        predictor = nn.Sequential(
+            nn.Linear(latent_dim + 2*dim_x*categories_x, dim_h), 
+            nn.ReLU(), 
+            nn.Linear(dim_h, dim_y*categories_y))
+
 
     return encoder, decoder, predictor
 
@@ -71,7 +126,7 @@ class ConvEncoderXY(nn.Module):
     Convolutional encoder for input X and MLP for the concatenation of
     the transformed X and the target Y.
     """
-    def __init__(self, dim_x, dim_hx, dim_y, conv_net, dim_h, latent_dim, **args):
+    def __init__(self, dim_x, dim_hx, dim_y, conv_net, dim_h, latent_dim, channels=1, **args):
         """
         Inialization
 
@@ -93,12 +148,13 @@ class ConvEncoderXY(nn.Module):
         self.encoderXY = nn.Sequential(
             nn.Sequential(nn.Linear(dim_hx + dim_x + 2*dim_y, dim_h), nn.ReLU(), nn.Linear(dim_h, 2 * latent_dim))
         )
+        self.channels = channels
 
-    def forward(self, xy):
+    def forward(self, xy, ):
         x = xy[..., :self.dim_x]
         obs_x = xy[..., self.dim_x:2*self.dim_x]
         y_and_mask = xy[..., -2*self.dim_y:]
-        x_image = x.reshape(x.shape[0], 1, int(np.sqrt(x.shape[1])), int(np.sqrt(x.shape[1]))) # Assume square images (batch_size, 1, HW, HW)
+        x_image = x.reshape(x.shape[0], self.channels, int(np.sqrt(x.shape[1]/self.channels)), int(np.sqrt(x.shape[1]/self.channels))) # Assume square images (batch_size, 1, HW, HW)
         hx = self.conv_net(x_image)
         hx = hx.reshape(hx.shape[0], self.dim_hx)
         hxy = torch.cat([hx, obs_x, y_and_mask], -1)
@@ -143,10 +199,35 @@ class View(nn.Module):
         return tensor.view(self.size)
 
 
+
+class ViewAfter(nn.Module):
+    """ For reshaping tensors inside Sequential objects"""
+    def __init__(self, after_dim=0, shape=0):
+        super(ViewAfter, self).__init__()
+        self.after_dim = after_dim
+        self.shape = shape
+
+    def forward(self, tensor):
+        return tensor.view(tensor.shape[:self.after_dim] + self.shape)
+
+
+class SplitDim(nn.Module):
+    """ splitting a dim into two new dims"""
+    def __init__(self, axis=0, dim2=256):
+        super(SplitDim, self).__init__()
+        self.axis = axis
+        self.dim2 = dim2
+
+    def forward(self, tensor):
+        return tensor.view(list(tensor.shape[:self.axis]) + [-1, self.dim2] + list(tensor.shape[self.axis+1:]))
+
+
+
+
 class Flatten(nn.Module):
     """ For flattening image tensors to match HxW as the last dimension"""
     def __init__(self):
-        super(View, self).__init__()
+        super(Flatten, self).__init__()
 
     def forward(self, image):
-        return torch.flatten(image, -2, -1)
+        return torch.flatten(image, -3, -1)

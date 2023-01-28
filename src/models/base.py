@@ -80,7 +80,7 @@ class Likelihood(nn.Module):
         # ============= Bernoulli ============= #
         elif self.type=='bernoulli':
             data = data.repeat(theta.shape[-2], 1, 1).permute(1, 0, 2)
-            logp = -BCEWithLogitsLoss(reduction='none', pos_weight=self.pos_weight)(theta, data)
+            logp = -BCEWithLogitsLoss(reduction='none', pos_weight=self.pos_weight)(theta, data.float())
             logp = logp * observed.unsqueeze(-2)
         
         return logp
@@ -464,9 +464,18 @@ class BaseVAE(pl.LightningModule):
         # mean per sample
         ll_xu = ll_xu[torch.isfinite(ll_xu)].mean()
 
+        # Log-likelihood of the observed variables
+        rec = self.decoder.logp(xt, observed_x, theta=theta_x)
+        # mean per dimension
+        rec = rec.sum(-1, keepdim=True) / observed_x.sum(-1, keepdim=True).unsqueeze(-2)
+        ll_xo = torch.logsumexp(rec, dim=-2) - torch.log(torch.Tensor([samples])).to(self.device)
+
+        # mean per sample
+        ll_xo = ll_xo[torch.isfinite(ll_xo)].mean()
+
         self.validation=False
         
-        return {"ll_y_test": ll_y, "ll_x_test": ll_xu, "metric_test": metric, "elbo_test": elbo}
+        return {"ll_y_test": ll_y, "ll_xu_test": ll_xu, "ll_xo_test": ll_xo, "metric_test": metric, "elbo_test": elbo}
  
     def validation_epoch_end(self, outputs: list):
         """
@@ -478,7 +487,7 @@ class BaseVAE(pl.LightningModule):
         ll_y = torch.stack(
             [x["ll_y_test"] for x in outputs]).mean()
         ll_xu = torch.stack(
-            [x["ll_x_test"] for x in outputs]).mean()
+            [x["ll_xu_test"] for x in outputs]).mean()
         metric = torch.stack(
             [x["metric_test"] for x in outputs]).mean()
         elbo = torch.stack(
@@ -547,6 +556,10 @@ class BaseVAE(pl.LightningModule):
 
         # Log-likelihood of the unobserved variables
         rec = self.decoder.logp(xt, torch.logical_not(observed_x), theta=theta_x)
+
+        ll_xu_d = torch.logsumexp(rec, dim=-2) - torch.log(torch.Tensor([samples])).to(self.device)
+        ll_xu_d = ll_xu_d.sum(0, keepdim=True) / torch.logical_not(observed_x).sum(0, keepdim=True).unsqueeze(-2)
+
         # mean per dimension
         rec = rec.sum(-1, keepdim=True) / torch.logical_not(observed_x).sum(-1, keepdim=True).unsqueeze(-2)
         ll_xu = torch.logsumexp(rec, dim=-2) - torch.log(torch.Tensor([samples])).to(self.device)
@@ -554,8 +567,25 @@ class BaseVAE(pl.LightningModule):
         # mean per sample
         ll_xu = ll_xu[torch.isfinite(ll_xu)].mean()
 
+        # Metrics of the imputation of unobserved variables
+
+        error_xu = self.error_x(xt, torch.logical_not(observed_x), theta_x.mean(-2))
+
+        # Log-likelihood of the observed variables
+        rec = self.decoder.logp(xt, observed_x, theta=theta_x)
+
+        ll_xo_d = torch.logsumexp(rec, dim=-2) - torch.log(torch.Tensor([samples])).to(self.device)
+        ll_xo_d = ll_xo_d.sum(0, keepdim=True) / observed_x.sum(0, keepdim=True).unsqueeze(-2)
+
+        # mean per dimension
+        rec = rec.sum(-1, keepdim=True) / observed_x.sum(-1, keepdim=True).unsqueeze(-2)
+        ll_xo = torch.logsumexp(rec, dim=-2) - torch.log(torch.Tensor([samples])).to(self.device)
+
+        # mean per sample
+        ll_xo = ll_xo[torch.isfinite(ll_xo)].mean()
+
         
-        return {'ll_y': ll_y, 'metric': metric, 'll_xu': ll_xu}    
+        return {'ll_y': ll_y, 'metric': metric, 'll_xu': ll_xu, 'll_xu_d': ll_xu_d, 'll_xo': ll_xo, 'll_xo_d': ll_xo_d, 'mean_error_xu': error_xu}    
     
     def test_epoch_end(self, outputs: list, save=True) -> None:
         """
@@ -568,20 +598,33 @@ class BaseVAE(pl.LightningModule):
         metric_mean =  torch.mean(torch.stack([o['metric'] for o in outputs]))
         ll_y_mean =  torch.mean(torch.stack([o['ll_y'] for o in outputs]))
         ll_xu_mean =  torch.mean(torch.stack([o['ll_xu'] for o in outputs]))
+        ll_xu_d_mean =  torch.mean(torch.stack([o['ll_xu_d'] for o in outputs]), dim=0)
+        ll_xo_mean =  torch.mean(torch.stack([o['ll_xo'] for o in outputs]))
+        ll_xo_d_mean =  torch.mean(torch.stack([o['ll_xo_d'] for o in outputs]), dim=0)
+        error_xu_mean =  torch.mean(torch.stack([o['mean_error_xu'] for o in outputs]))
 
-        metrics = {'ll_y_mean': ll_y_mean, 'metric_mean': metric_mean, 'll_xu_mean': ll_xu_mean}
+        metrics = {'ll_y_mean': ll_y_mean, 'metric_mean': metric_mean, 'll_xu_mean': ll_xu_mean, 
+                    'll_xu_d_mean': ll_xu_d_mean, 'll_xo_mean': ll_xo_mean, 'll_xo_d_mean': ll_xo_d_mean, 'error_xu_mean': error_xu_mean}
         
         if save:
             metrics_np = {
                     'll_y': metrics['ll_y_mean'].cpu().detach().numpy(),
                     'll_xu': metrics['ll_xu_mean'].cpu().detach().numpy(),
+                    'll_xu_d': metrics['ll_xu_d_mean'].cpu().detach().numpy(),
+                    'll_xo': metrics['ll_xo_mean'].cpu().detach().numpy(),
+                    'll_xo_d': metrics['ll_xo_d_mean'].cpu().detach().numpy(),
                     'metric': metrics['metric_mean'].cpu().detach().numpy(),
+                    'error_xu': metrics['error_xu_mean'].cpu().detach().numpy(),
                 }
             np.save("{}/test_metrics".format(self.logger.log_dir), metrics_np)
 
             self.log("final_test_ll_y", ll_y_mean)
             self.log("final_test_ll_xu", ll_xu_mean)
+            self.log("final_test_ll_xu_d", ll_xu_d_mean)
+            self.log("final_test_ll_xo", ll_xo_mean)
+            self.log("final_test_ll_xo_d", ll_xo_d_mean)
             self.log("final_test_metric", metric_mean)
+            self.log("final_test_error_xu", error_xu_mean)
 
         return metrics
     
@@ -742,6 +785,26 @@ class BaseVAE(pl.LightningModule):
             metric = (y_pred!=y).float().mean()
 
         return metric
+    
+    def error_x(self, x: torch.Tensor, observed_x: torch.Tensor, theta_x: torch.Tensor) -> torch.Tensor:
+        """
+        Computes the chosen prediction metric 
+
+        Args:
+            x (torch.Tensor): ground truth                                              (batch_size, dim_x)
+            observed_x (torch.Tensor): mask of the observed variables                   (batch_size, dim_x)
+            theta_x (torch.Tensor): parameters of the likelihood distribution           (batch_size, latent_samples, dim_x)
+
+        Returns:
+            torch.Tensor: mean metric
+        """
+
+        x = x[observed_x.bool()]
+        theta_x = theta_x[observed_x.bool()]
+        rmse = torch.sqrt(torch.nn.MSELoss()(theta_x, x))
+
+        return rmse
+    
 
     def log_likelihood_y(self, batch: tuple, samples=100) -> torch.Tensor:
         """
@@ -832,6 +895,51 @@ class BaseVAE(pl.LightningModule):
         
         # When all the data is observed, logp will be nan
         return ll_xu
+
+    def log_likelihood_xo(self, batch: tuple, samples=100):
+        """
+        Computes the approximated log likelihood of the data p(x)
+
+        Args:
+            batch (tuple): contains (data, observed_data, target, observed_target)
+            samples (int): number of samples from the latent for MC. Defaults to 100.
+
+        Returns:
+            torch.Tensor: mean log likelihood of the data
+        """
+        
+        batch_ = [b.clone() for b in batch]
+         
+        # We do not observe the target
+        batch_[2] = torch.zeros(batch[0].shape[0], self.dim_y).to(self.device)
+        batch_[3] = torch.zeros_like(batch_[2]).to(self.device)
+        
+
+        # Get data
+        x, observed_x, y, observed_y = batch_
+
+        xn = self.normalize_x(x)
+        
+        xt, yt, xy, observed = self.preprocess_batch(batch_) 
+        # xt is the preprocessed input (xt=x if no preprocessing)
+        # observed is observed_x OR observed_y (for not using kl if no observed data)
+
+        mu_z, logvar_z = self.encoder(xy)
+        z = self.sample_z(mu_z, logvar_z, samples=samples)
+        theta_x = self.decoder(z)
+
+        theta_x = self.invert_preproc(theta_x)
+
+        # Log-likelihood of the observed variables
+        rec = self.decoder.logp(xn, observed_x, theta=theta_x)
+        ll_xo = torch.logsumexp(rec, dim=-2) - np.log(samples)
+
+        # divide each xu by the number of variables:
+        # mean per sample
+        ll_xo = ll_xo[torch.isfinite(ll_xo)].mean()
+        
+        # When all the data is observed, logp will be nan
+        return ll_xo
 
     def active_learning(self, batch: tuple, bins=5, samples=1000, step=1) -> tuple:
         """
@@ -1025,7 +1133,7 @@ class BaseVAE(pl.LightningModule):
         if xn==None:
             xn = xt
 
-        theta_x = self.decoder(z)
+        theta_x = self.decoder(z).reshape(z.shape[0], -1, xt.shape[-1])
         x_hat = self.build_x_hat(xn, observed_x, theta_x)
         zx = torch.cat([z,x_hat],dim=-1)
 
@@ -1239,11 +1347,14 @@ class BaseVAE(pl.LightningModule):
     def train_dataloader(self):
 
         loader = get_dataset_loader(self.dataset, split='train', path=self.data_path, batch_size=self.batch_size, split_idx=self.split_idx)
-        self.register_buffer('mean_y', torch.Tensor(loader.dataset.labels.mean(0, keepdims=True)).to(self.device))
-        self.register_buffer('std_y', torch.Tensor(loader.dataset.labels.std(0, keepdims=True)).to(self.device))
-        self.register_buffer('mean_x', torch.Tensor(loader.dataset.data.mean(0, keepdims=True)).to(self.device))
-        self.register_buffer('std_x', torch.Tensor(loader.dataset.data.std(0, keepdims=True)).to(self.device))
-        
+
+        if self.likelihood_y.__contains__('gaussian'):
+            self.register_buffer('mean_y', torch.Tensor(loader.dataset.labels.mean(0, keepdims=True)).to(self.device))
+            self.register_buffer('std_y', torch.Tensor(loader.dataset.labels.std(0, keepdims=True)).to(self.device))
+        if self.likelihood_x.__contains__('gaussian'):
+            self.register_buffer('mean_x', torch.Tensor(loader.dataset.data.mean(0, keepdims=True)).to(self.device))
+            self.register_buffer('std_x', torch.Tensor(loader.dataset.data.std(0, keepdims=True)).to(self.device))
+            
         if self.likelihood_y=='bernoulli':
             if self.imbalanced_y:
                 pos_class = loader.dataset.labels.sum()

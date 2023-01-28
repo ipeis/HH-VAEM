@@ -26,8 +26,6 @@ if LOGDIR==None: # you didnt set another logdir
 LOGDIR = '{}/'.format( os.getcwd()[:os.getcwd().find('HH-VAEM') + 7] )
 
 # Parameter configuration: {'dataset': {'model': {params}}}
-
-# Old configs with large T
 configs = {
     'boston': {
         'VAE': {
@@ -121,6 +119,19 @@ configs = {
             'batch_size': 100,
             'epochs': 4000  # for 4000*5=20000 steps
         },
+        'HVAEnoreparam': {
+            'dim_x': 13,
+            'dim_y': 1, 
+            'latent_dims': [10, 5],
+            'balance_kl_steps': 1e3, 
+            'anneal_kl_steps': 1e3,
+            'arch': 'base',
+            'likelihood_x': 'gaussian', 
+            'likelihood_y': 'gaussian', 
+            'prediction_metric':'rmse',
+            'batch_size': 100,
+            'epochs': 4000  # for 4000*5=20000 steps
+        },
         'HHVAE': {
             'dim_x': 13,
             'dim_y': 1, 
@@ -133,7 +144,23 @@ configs = {
             'prediction_metric':'rmse',
             'batch_size': 100,
             'epochs': 4000,  # for 4000*5=20000 steps
-            'sksd': 1,
+            'sksd': 0,
+            'pre_steps': 18e3,
+            'T': 15,
+        },
+        'HHVAEnoreparam': {
+            'dim_x': 13,
+            'dim_y': 1, 
+            'latent_dims': [10, 5],
+            'balance_kl_steps': 1e3, 
+            'anneal_kl_steps': 1e3,
+            'arch': 'base',
+            'likelihood_x': 'gaussian', 
+            'likelihood_y': 'gaussian', 
+            'prediction_metric':'rmse',
+            'batch_size': 100,
+            'epochs': 4000,  # for 4000*5=20000 steps
+            'sksd': 0,
             'pre_steps': 18e3,
             'T': 15,
         },
@@ -1682,6 +1709,8 @@ configs = {
     },
     'mnist': {
         'VAE': {
+            'arch': 'mnist_cnn',
+            'dim_h': 512,
             'latent_dim': 20,
             'dim_x': 28**2,
             'dim_y': 1,
@@ -1689,22 +1718,13 @@ configs = {
             'likelihood_y': 'categorical',
             'categories_y': 10,
             'prediction_metric':'accuracy',
+            'lr': 2e-4,
             'batch_size': 100,
-            'epochs': 93,  # for 93*540=50e3 steps
-        },
-        'MIWAE': {
-            'latent_dim': 20,
-            'samples_MC': 5,   # IW samples
-            'dim_x': 28**2,
-            'dim_y': 1,
-            'likelihood_x': 'bernoulli', 
-            'likelihood_y': 'categorical',
-            'categories_y': 10,
-            'prediction_metric':'accuracy',
-            'batch_size': 100,
-            'epochs': 93,  # for 93*540=50e3 steps
+            'epochs': 186,  # for 186*540=100e3 steps
         },
         'HMCVAE': {
+            'arch': 'mnist_cnn',
+            'dim_h': 512,
             'latent_dim': 20,
             'dim_x': 28**2,
             'dim_y': 1,
@@ -1712,26 +1732,50 @@ configs = {
             'likelihood_y': 'categorical',
             'categories_y': 10,
             'prediction_metric':'accuracy',
+            'lr_pre': 2e-4,
+            'lr_encoder': 2e-4,
+            'lr_decoder': 2e-4,
+            'lr_predictor': 2e-4,
             'batch_size': 100,
-            'epochs': 93,  # for 93*540=50e3 steps
-            'pre_steps': 45e3,
-            'T': 30,
+            'epochs': 186,  # for 186*540=100e3 steps
+            'pre_steps': 99e3,
+            'T': 10,    # to make it feasible
         },
         'HVAE': {
+            'arch': 'mnist_cnn',
+            'dim_h': 512,
             'dim_x': 28**2,
             'dim_y': 1, 
             'latent_dims': [20, 10],
             'balance_kl_steps': 5e3, 
             'anneal_kl_steps': 5e3,
-            'arch': 'base',
             'likelihood_x': 'bernoulli', 
             'likelihood_y': 'categorical', 
             'categories_y': 10,
             'prediction_metric':'accuracy',
+            'lr': 2e-4,
             'batch_size': 100,
-            'epochs': 93,  # for 93*540=50e3 steps
+            'epochs': 186,  # for 186*540=100e3 steps
+        },
+        'HVAEnoreparam': {
+            'arch': 'mnist_cnn',
+            'dim_h': 512,
+            'dim_x': 28**2,
+            'dim_y': 1, 
+            'latent_dims': [20, 10],
+            'balance_kl_steps': 5e3, 
+            'anneal_kl_steps': 5e3,
+            'likelihood_x': 'bernoulli', 
+            'likelihood_y': 'categorical', 
+            'categories_y': 10,
+            'prediction_metric':'accuracy',
+            'lr': 2e-4,
+            'batch_size': 100,
+            'epochs': 186,  # for 186*540=100e3 steps
         },
         'HHVAE': {
+            'arch': 'mnist_cnn',
+            'dim_h': 512,
             'dim_x': 28**2,
             'dim_y': 1, 
             'latent_dims': [20, 10],
@@ -1741,81 +1785,19 @@ configs = {
             'likelihood_y': 'categorical', 
             'categories_y': 10,
             'prediction_metric':'accuracy',
+            'lr_pre': 2e-4,
+            'lr_encoder': 2e-4,
+            'lr_decoder': 2e-4,
+            'lr_prior': 2e-4,
+            'lr_predictor': 2e-4,
             'batch_size': 100,
-            'epochs': 93,  # for 93*540=50e3 steps
-            'pre_steps': 45e3,
-            'T': 30,
+            'epochs': 186,  # for 186*540=100e3 steps
+            'pre_steps': 99e3,
+            'T': 10,    # to make it feasible
         },
     },
     'fashion_mnist': {
         'VAE': {
-            'latent_dim': 20,
-            'dim_x': 28**2,
-            'dim_y': 1,
-            'likelihood_x': 'bernoulli', 
-            'likelihood_y': 'categorical',
-            'categories_y': 10,
-            'prediction_metric':'accuracy',
-            'batch_size': 100,
-            'epochs': 93,  # for 93*540=50e3 steps
-        },
-        'MIWAE': {
-            'latent_dim': 20,
-            'samples_MC': 5,   # IW samples
-            'dim_x': 28**2,
-            'dim_y': 1,
-            'likelihood_x': 'bernoulli', 
-            'likelihood_y': 'categorical',
-            'categories_y': 10,
-            'prediction_metric':'accuracy',
-            'batch_size': 100,
-            'epochs': 93,  # for 93*540=50e3 steps
-        },
-        'HMCVAE': {
-            'latent_dim': 20,
-            'dim_x': 28**2,
-            'dim_y': 1,
-            'likelihood_x': 'bernoulli', 
-            'likelihood_y': 'categorical',
-            'categories_y': 10,
-            'prediction_metric':'accuracy',
-            'batch_size': 100,
-            'epochs': 93,  # for 93*540=50e3 steps
-            'pre_steps': 45e3,
-            'T': 30,
-        },
-        'HVAE': {
-            'dim_x': 28**2,
-            'dim_y': 1, 
-            'latent_dims': [20, 10],
-            'balance_kl_steps': 5e3, 
-            'anneal_kl_steps': 5e3,
-            'arch': 'base',
-            'likelihood_x': 'bernoulli', 
-            'likelihood_y': 'categorical', 
-            'categories_y': 10,
-            'prediction_metric':'accuracy',
-            'batch_size': 100,
-            'epochs': 93,  # for 93*540=50e3 steps
-        },
-        'HHVAE': {
-            'dim_x': 28**2,
-            'dim_y': 1, 
-            'latent_dims': [20, 10],
-            'balance_kl_steps': 5e3, 
-            'anneal_kl_steps': 5e3,
-            'likelihood_x': 'bernoulli', 
-            'likelihood_y': 'categorical', 
-            'categories_y': 10,
-            'prediction_metric':'accuracy',
-            'batch_size': 100,
-            'epochs': 93,  # for 93*540=50e3 steps
-            'pre_steps': 45e3,
-            'T': 30,
-        },
-    },
-    'mnist_cnn': {
-        'VAE': {
             'arch': 'mnist_cnn',
             'dim_h': 512,
             'latent_dim': 20,
@@ -1838,6 +1820,7 @@ configs = {
             'likelihood_y': 'categorical',
             'categories_y': 10,
             'prediction_metric':'accuracy',
+            
             'batch_size': 100,
             'epochs': 186,  # for 186*540=100e3 steps
             'pre_steps': 99e3,
@@ -1876,65 +1859,73 @@ configs = {
             'T': 10,    # to make it feasible
         },
     },
-    'fashion_mnist_cnn': {
+    'celeba': {
         'VAE': {
-            'arch': 'mnist_cnn',
+            'arch': 'celeba',
             'dim_h': 512,
-            'latent_dim': 20,
-            'dim_x': 28**2,
-            'dim_y': 1,
+            'lr': 2e-4,
+            'latent_dim': 32,
+            'dim_x': 3*64**2,
+            'dim_y': 40,
             'likelihood_x': 'bernoulli', 
-            'likelihood_y': 'categorical',
-            'categories_y': 10,
+            'likelihood_y': 'bernoulli',
+            'categories_y': 1,
             'prediction_metric':'accuracy',
-            'batch_size': 100,
-            'epochs': 186,  # for 186*540=100e3 steps
+            'batch_size': 128,
+            'epochs': 66,  
         },
         'HMCVAE': {
-            'arch': 'mnist_cnn',
+            'arch': 'celeba',
             'dim_h': 512,
-            'latent_dim': 20,
-            'dim_x': 28**2,
-            'dim_y': 1,
+            'lr': 2e-4,
+            'latent_dim': 32,
+            'dim_x': 3*64**2,
+            'dim_y': 40,
             'likelihood_x': 'bernoulli', 
-            'likelihood_y': 'categorical',
-            'categories_y': 10,
+            'likelihood_y': 'bernoulli',
+            'categories_y': 1,
             'prediction_metric':'accuracy',
-            'batch_size': 100,
-            'epochs': 186,  # for 186*540=100e3 steps
-            'pre_steps': 99e3,
+            'batch_size': 64,
+            'epochs': 66,  
+            'pre_steps': 145e3,
             'T': 10,    # to make it feasible
-        },
+        },  
         'HVAE': {
-            'arch': 'mnist_cnn',
+            'arch': 'celeba',
             'dim_h': 512,
-            'dim_x': 28**2,
-            'dim_y': 1, 
-            'latent_dims': [20, 10],
+            'lr': 2e-4,
+            'dim_x': 3*64**2,
+            'dim_y': 40,
+            'likelihood_x': 'bernoulli', 
+            'likelihood_y': 'bernoulli',
+            'categories_y': 1,
+            'prediction_metric': 'accuracy',
             'balance_kl_steps': 5e3, 
             'anneal_kl_steps': 5e3,
-            'likelihood_x': 'bernoulli', 
-            'likelihood_y': 'categorical', 
-            'categories_y': 10,
-            'prediction_metric':'accuracy',
-            'batch_size': 100,
-            'epochs': 186,  # for 186*540=100e3 steps
+            'batch_size': 64,
+            'epochs': 66,  
         },
+
         'HHVAE': {
-            'arch': 'mnist_cnn',
+            'arch': 'celeba',
             'dim_h': 512,
-            'dim_x': 28**2,
-            'dim_y': 1, 
-            'latent_dims': [20, 10],
+            'lr_pre': 2e-4,
+            'lr_encoder': 2e-4,
+            'lr_decoder': 2e-4,
+            'lr_prior': 2e-4,
+            'lr_predictor': 2e-4,
+            'latent_dims': [32, 16],
+            'dim_x': 3*64**2,
+            'dim_y': 40,
+            'likelihood_x': 'bernoulli', 
+            'likelihood_y': 'bernoulli',
+            'categories_y': 1,
+            'prediction_metric': 'accuracy',
             'balance_kl_steps': 5e3, 
             'anneal_kl_steps': 5e3,
-            'likelihood_x': 'bernoulli', 
-            'likelihood_y': 'categorical', 
-            'categories_y': 10,
-            'prediction_metric':'accuracy',
-            'batch_size': 100,
-            'epochs': 186,  # for 186*540=100e3 steps
-            'pre_steps': 99e3,
+            'batch_size': 64,
+            'epochs': 66,  
+            'pre_steps': 145e3,
             'T': 10,    # to make it feasible
         },
     },

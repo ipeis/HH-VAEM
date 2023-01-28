@@ -333,10 +333,10 @@ class HMCVAE(BaseVAE):
     # ============= Modified PL functions ============= #
     def configure_optimizers(self):
         opt_vae = torch.optim.Adam(list(self.decoder.parameters()) + list(self.predictor.parameters())
-                                   + list(self.encoder.parameters()), lr=self.lr_pre, weight_decay=0.01)
-        opt_decoder = torch.optim.Adam(list(self.decoder.parameters()), lr=self.lr_decoder, weight_decay=0.01)
-        opt_predictor = torch.optim.Adam(list(self.predictor.parameters()), lr=self.lr_predictor, weight_decay=0.01)
-        opt_encoder = torch.optim.Adam(list(self.encoder.parameters()), lr=self.lr_encoder, weight_decay=0.01)
+                                   + list(self.encoder.parameters()), lr=self.lr_pre)
+        opt_decoder = torch.optim.Adam(list(self.decoder.parameters()), lr=self.lr_decoder)
+        opt_predictor = torch.optim.Adam(list(self.predictor.parameters()), lr=self.lr_predictor)
+        opt_encoder = torch.optim.Adam(list(self.encoder.parameters()), lr=self.lr_encoder)
         opt_hmc = torch.optim.Adam([self.HMC.log_eps], lr=self.lr_hmc)
         opt_scale = torch.optim.Adam([self.HMC.log_inflation], lr=self.lr_scale)
 

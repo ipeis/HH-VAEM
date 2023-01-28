@@ -102,6 +102,7 @@ class HMC(nn.Module):
         z = torch.randn_like(mu0) * (sigma0 * inflation) + mu0
 
         z_list = [z]    # to store the whole chains
+        #accepted_list = []    # to store the whole chains
         for t in range(self.T):
             r = torch.randn_like(z) * torch.exp(0.5 * log_v_r[t, :]).type_as(z)
             z_new, r_new = self.leapfrog(z, r, torch.exp(log_eps[t, :]), log_v_r[t, :], self.dlogp)
@@ -120,7 +121,8 @@ class HMC(nn.Module):
             accepted = accepted.repeat([self.dim, 1, 1]).transpose(1, 2).T.int()
             z = z_new * accepted + (1 - accepted) * z
             z_list.append(z)
-        return z, torch.stack(z_list)
+            #accepted_list.append(accepted[0,:, 0].float().detach().cpu().numpy())
+        return z, torch.stack(z_list)#, np.mean(accepted_list)
 
     def generate_samples_KSD(self, mu0: torch.Tensor, var0: torch.Tensor, chains: int=None):
         """

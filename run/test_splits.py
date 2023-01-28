@@ -18,7 +18,7 @@ distributed system and calling the script test.py for a single split.
 """
 
 parser = argparse.ArgumentParser(description='Average test evaluation on all the test splits')
-parser.add_argument('--model', type=str, default='HHVAEM',
+parser.add_argument('--model', type=str, default='VAHHVAEMEM',
                     help='model to use (VAE, HVAE, HMCVAE, HHVAE, VAEM, HVAEM, HMCVAEM, HHVAEM)')
 parser.add_argument('--dataset', type=str, default='boston',
                     help='dataset to train (boston, mnist, ...)')
@@ -44,7 +44,11 @@ if __name__ == '__main__':
     metrics = {
             'll_y': [],
             'll_xu': [],
+            'll_xu_d': [],
+            'll_xo': [],
+            'll_xo_d': [],
             'metric': [],
+            'error_xu': [],
         }
 
     for key in metrics.keys():
@@ -56,15 +60,19 @@ if __name__ == '__main__':
         'std_ll_y': metrics['ll_y'].std(axis=0),
         'mean_ll_xu': metrics['ll_xu'].mean(axis=0),
         'std_ll_xu': metrics['ll_xu'].std(axis=0),
+        'mean_ll_xu_d': metrics['ll_xu_d'].mean(axis=0),
+        'std_ll_xu_d': metrics['ll_xu_d'].std(axis=0),
+        'mean_ll_xo': metrics['ll_xo'].mean(axis=0),
+        'std_ll_xo': metrics['ll_xo'].std(axis=0),
+        'mean_ll_xo_d': metrics['ll_xo_d'].mean(axis=0),
+        'std_ll_xo_d': metrics['ll_xo_d'].std(axis=0),
         'mean_metric': metrics['metric'].mean(axis=0),
-        'std_metric': metrics['metric'].std(axis=0)
+        'std_metric': metrics['metric'].std(axis=0),
+        'mean_error_xu': metrics['error_xu'].mean(axis=0),
+        'std_error_xu': metrics['error_xu'].std(axis=0)
     }
 
     print(metrics_final)
     np.save(ckpt_paths[0].split('split_0')[0] + 'test_metrics_' + args.version, metrics_final)
-    
-
-
-
 
 

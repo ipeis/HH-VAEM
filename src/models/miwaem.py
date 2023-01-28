@@ -51,9 +51,9 @@ class MIWAEM(VAEM):
             lr_marg (float, optional): learning rate for pretraining marginal VAEs. Defaults to 1e-3.
         """
 
-        super(VAEM, self).__init__(dataset=dataset, dim_x=dim_x, dim_y=dim_y, 
-            latent_dim = latent_dim, arch=arch, dim_h=dim_h, likelihood_x = likelihood_x, likelihood_y = likelihood_y, 
-            variance=variance, imbalanced_y = imbalanced_y,
+        super(MIWAEM, self).__init__(dataset=dataset, dim_x=dim_x, dim_y=dim_y, 
+            latent_dim = latent_dim, arch=arch, dim_h=dim_h, likelihood_x = likelihood_x, likelihoods_x = likelihoods_x, likelihood_y = likelihood_y, 
+            variance=variance, imbalanced_y = imbalanced_y, categories_x=categories_x,
             categories_y=categories_y, prediction_metric=prediction_metric, batch_size=batch_size, lr=lr, 
             samples_MC = samples_MC, data_path=data_path, split_idx=split_idx)
         

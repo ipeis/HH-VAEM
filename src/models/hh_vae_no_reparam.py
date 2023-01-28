@@ -5,15 +5,15 @@
 #  been included as part of this package.                                       +
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-from src.models.h_vae import *
+from src.models.h_vae_no_reparam import *
 from src.models.hmc import *
 
 
 # ============= HHVAE ============= #
 
-class HHVAE(HVAE):
+class HHVAENoReparam(HVAENoReparam):
     """
-    Implements a Hierarchical Hamiltonian VAE (HH-VAE) as described in https://arxiv.org/abs/2202.04599
+    Implements a Hierarchical Hamiltonian VAE (HH-VAE) without reparameterization as described in https://arxiv.org/abs/2202.04599
 
     """
     def __init__(self, 
@@ -72,7 +72,7 @@ class HHVAE(HVAE):
             update_s_each (int, optional): Interval of steps for optimizing the scale factor. Defaults to 10.
         """
 
-        super(HHVAE, self).__init__(dataset=dataset, dim_x=dim_x, dim_y=dim_y, 
+        super(HHVAENoReparam, self).__init__(dataset=dataset, dim_x=dim_x, dim_y=dim_y, 
             arch=arch, dim_h=dim_h, likelihood_x = likelihood_x, likelihood_y = likelihood_y, 
             variance=variance, imbalanced_y = imbalanced_y,
             categories_y=categories_y,
@@ -141,9 +141,9 @@ class HHVAE(HVAE):
         xt, yt, xy, observed = self.preprocess_batch(batch) 
         # xt is the preprocessed input (xt=x if no preprocessing)
         # observed is observed_x OR observed_y (for not using kl if no observed data)
-        mus, logvars = self.encoder(xy)
+        deltas_mu, deltas_logvar = self.encoder(xy)
 
-        z = self.sample_z(mus, logvars, samples=samples, hmc=False)
+        z, mus, logvars = self.sample_z(deltas_mu, deltas_logvar, samples=samples, hmc=False)
         theta_x = self.decoder(z)
         x_hat = self.build_x_hat(xn, observed_x, theta_x)
 
@@ -151,7 +151,7 @@ class HHVAE(HVAE):
 
         rec_x = self.decoder.logp(xt, observed_x, z=z, theta=theta_x).sum(-1)
         rec_y = self.predictor.logp(yt, observed_y, z=zx).sum(-1)
-        kls = self.encoder.regularizer(mus, logvars, observed)
+        kls = self.encoder.regularizer(deltas_mu, deltas_logvar, logvars, observed)
         
         elbo = rec_x + rec_y - kls.sum(0).unsqueeze(-1)
 
@@ -179,9 +179,9 @@ class HHVAE(HVAE):
             self.HMC.log_inflation.requires_grad = False
             
             # Encoder again for not sharing gradients
-            mus, logvars = self.encoder(xy)
-            zT, E = self.sample_z(mus, logvars, samples=self.chains, return_eps=True)
-            loss_1 = -self.HMC.logp(E)
+            deltas_mu, deltas_logvar = self.encoder(xy)
+            zT, _, _ = self.sample_z(deltas_mu, deltas_logvar, hmc=True, samples=self.chains, all_layers=True)
+            loss_1 = -self.HMC.logp(zT)
             loss_1 = loss_1[loss_1!=0].mean()
 
             if self.sksd==1:
@@ -192,7 +192,8 @@ class HHVAE(HVAE):
                 deactivate(self.prior)
                 deactivate(self.predictor)
                 self.HMC.log_eps.requires_grad = False
-                loss_2 = self.HMC.evaluate_sksd(torch.cat(mus, -1), torch.exp(torch.cat(logvars, -1)))
+                loss_2 = self.HMC.evaluate_sksd(torch.cat(mus, -1).reshape(-1, np.sum(self.latent_dims)), 
+                                                torch.exp(torch.cat(logvars, -1)).reshape(-1, np.sum(self.latent_dims)))
             else:
                 loss_2 = None
 
@@ -286,7 +287,7 @@ class HHVAE(HVAE):
 
             self.log('HMC_objective', -loss_1, on_step=False, on_epoch=True, prog_bar=True, logger=True)
             
-        self.log('ELBO', -loss_3, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log('ELBO', -loss_3, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         if logging:
             self.log('-rec_x', -rec_x, on_step=False, on_epoch=True, prog_bar=False, logger=True)
             self.log('-rec_y', -rec_y, on_step=False, on_epoch=True, prog_bar=False, logger=True)
@@ -297,7 +298,103 @@ class HHVAE(HVAE):
         self.step_idx+=1
         self.encoder.global_step += 1
 
-    def sample_z(self, mus: list, logvars: list, samples=1, hmc=True, return_eps=False, all_layers=False):
+    def validation_step(self, batch, batch_idx, samples=100, *args, **kwargs) -> dict:
+        """
+        Compute validation metrics
+
+        Args:
+            batch (tuple): contains (data, observed_data, target, observed_target)
+            batch_idx (int): batch index from the validation set
+            samples (int): number of samples from the latent for MC. Defaults to 100
+
+        Returns:
+            dict: containing approx log likelihoods logp(x) and logp(y), the chosen metric and the ELBO                             
+
+        """
+
+        self.validation=True
+
+        y_true = batch[2]
+        batch_ = [b.clone() for b in batch]
+         
+        # We do not observe the target in test
+        batch_[2] = torch.zeros(batch[0].shape[0], self.dim_y).to(self.device)
+        batch_[3] = torch.zeros_like(batch_[2]).to(self.device)
+        
+        # Get data
+        x, observed_x, y, observed_y = batch_
+        xn = self.normalize_x(x)
+        xt, yt, xy, observed = self.preprocess_batch(batch) 
+        # xt is the preprocessed input (xt=x if no preprocessing)
+        # observed is observed_x OR observed_y (for not using kl if no observed data)
+        deltas_mu, deltas_logvar = self.encoder(xy)
+
+        z, mus, logvars = self.sample_z(deltas_mu, deltas_logvar, samples=samples, hmc=self.hmc)
+        theta_x = self.decoder(z)
+        x_hat = self.build_x_hat(xn, observed_x, theta_x)
+
+        zx = torch.cat([z,x_hat],dim=-1)
+
+        theta_y = self.predictor(zx)
+
+        # Log-likelihood of the normalised target
+        yn_true = self.normalize_y(y_true)
+        rec = self.predictor.logp(yn_true, torch.ones_like(y_true), theta=theta_y)
+        # mean per dimension (y is all observed in test)
+        rec = rec.sum(-1, keepdim=True)
+
+        ll_y = torch.logsumexp(rec, dim=-2) - np.log(samples)
+        # mean per sample
+        ll_y = ll_y.mean()
+
+        theta_y = self.denormalize_y(theta_y)
+
+        # Prediction metric
+        metric = self.prediction_metric(theta_y.mean(-2), y_true)
+
+        theta_x = self.invert_preproc(theta_x)
+        # Log-likelihood of the unobserved variables
+        rec = self.decoder.logp(xn, torch.logical_not(observed_x), theta=theta_x)
+        # mean per dimension
+        rec = rec.sum(-1, keepdim=True) / torch.logical_not(observed_x).sum(-1, keepdim=True).unsqueeze(-2)
+        ll_xu = torch.logsumexp(rec, dim=-2) - np.log(samples)
+        
+        # mean per sample
+        ll_xu = ll_xu[torch.isfinite(ll_xu)].mean()
+
+        # Log-likelihood of the observed variables
+        rec = self.decoder.logp(xt, observed_x, theta=theta_x)
+        # mean per dimension
+        rec = rec.sum(-1, keepdim=True) / observed_x.sum(-1, keepdim=True).unsqueeze(-2)
+        ll_xo = torch.logsumexp(rec, dim=-2) - torch.log(torch.Tensor([samples])).to(self.device)
+
+        # mean per sample
+        ll_xo = ll_xo[torch.isfinite(ll_xo)].mean()
+
+        self.validation=False
+        
+        return {"ll_y_test": ll_y, "ll_xu_test": ll_xu, "ll_xo_test": ll_xo, "metric_test": metric}
+ 
+    def validation_epoch_end(self, outputs: list):
+        """
+        Compute mean epoch validation metrics from the batches
+
+        Args:
+            outputs (list): containing the dict with metrics from each batch (output of the validation_step)
+        """
+        ll_y = torch.stack(
+            [x["ll_y_test"] for x in outputs]).mean()
+        ll_xu = torch.stack(
+            [x["ll_xu_test"] for x in outputs]).mean()
+        metric = torch.stack(
+            [x["metric_test"] for x in outputs]).mean()
+
+        self.log('{}_test'.format(self.prediction_metric_name), metric, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log('ll_y_test', ll_y, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log('ll_xu_test', ll_xu, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+
+
+    def sample_z(self, deltas_mu: list, deltas_logvar: list, samples=1, hmc=True, all_layers=False):
         """
         Draw latent reparameterized samples Z from a given approx hierarchical posterior of Epsilon, parameterized by mu and logvar
 
@@ -313,50 +410,44 @@ class HHVAE(HVAE):
             transformed samples z1 from the shallow layer (default) or list with samples from all layers (from z1 to zL)
             if return_eps=True, also returns the latent samples Epsilon
         """
-        
-        if hmc==False or self.validation and self.global_step < self.pre_steps:
-        #if self.global_step < self.pre_steps or self.training==False:
-            mus = [m.repeat(samples, 1, 1).permute(1, 0, 2) for m in mus]
-            logvars = [l.repeat(samples, 1, 1).permute(1, 0, 2) for l in logvars]
-            # Gaussian approx
-            Z = [reparameterize(mus[-1], torch.exp(logvars[-1]))]
-            E = [Z[-1].clone()]
-            for l in np.arange(self.layers-2, -1, -1):
-                mu_z, logvar_z = torch.chunk(self.prior.NNs[l](Z[-1]), 2, dim=-1)
-                e = reparameterize(mus[l], torch.exp(logvars[l])) # sampled from the approx posterior
-                E.append(e)
-                z = mu_z + torch.sqrt(torch.exp(logvar_z)) * e
-                Z.append(z)
-            E = E[::-1]
-            
-        else:
-            # True posterior
-            mus = torch.cat(mus, -1)
-            logvars = torch.cat(logvars, -1)
-            E, _ = self.HMC.generate_samples_HMC(mus, torch.exp(logvars), chains=samples)
-            #E, _, accp_rate = self.HMC.generate_samples_HMC(mus, torch.exp(logvars), chains=samples)
-            #self.log('mean_acceptance_rate', accp_rate, on_step=True, on_epoch=True, prog_bar=False, logger=True)
-            E = self.make_tensor_list(E)
-            Z = [E[-1].clone()]
-            for l in np.arange(self.layers-2, -1, -1):
-                mu_z, logvar_z = torch.chunk(self.prior.NNs[l](Z[-1]), 2, dim=-1)
-                z = mu_z + torch.sqrt(torch.exp(logvar_z)) * E[l]
-                Z.append(z)
+        deltas_mu = [d.repeat(samples, 1, 1).permute(1, 0, 2) for d in deltas_mu]
+        deltas_logvar = [d.repeat(samples, 1, 1).permute(1, 0, 2) for d in deltas_logvar]
+
+        # We sample top-down (from zL to z1). zL follows standard prior prior
+        mus = [torch.zeros_like(deltas_mu[-1])]
+        logvars = [torch.zeros_like(mus[0])]
+
+        Z = [reparameterize(deltas_mu[-1], torch.exp(deltas_logvar[-1]))]
+        for l in np.arange(self.layers-2, -1, -1):
+            mu_l, logvar_l = torch.chunk(self.prior.NNs[l](Z[-1]), 2, dim=-1)
+            mus.append(mu_l)
+            logvars.append(logvar_l)
+            Z.append(reparameterize(mu_l + deltas_mu[l], torch.exp(logvar_l + deltas_logvar[l])))
 
         # Flip Z to follow the notation of the model (element 0 -> z1)
         Z = Z[::-1]
-        E_tensor = torch.cat(E, -1)
-        #Z = torch.cat(Z, -1)
+        mus = mus[::-1]
+        logvars = logvars[::-1]
 
-        if all_layers==False:
-            Z = Z[0]
+        if hmc==False or self.validation and self.global_step < self.pre_steps:
+            if all_layers: 
+                return Z, mus, logvars
+            else: return Z[0], mus, logvars
+            
+        else:
 
-        if self.training and self.validation==False:
-            self.E_epoch.append(E_tensor.reshape(E_tensor.shape[0], np.sum(self.latent_dims)))
+            mus = torch.cat(mus, -1)[:, 0, :].reshape(-1, np.sum(self.latent_dims))
+            logvars = torch.cat(logvars, -1)[:, 0, :].reshape(-1, np.sum(self.latent_dims))
 
-        if return_eps==False:
-            return Z
-        else: return Z, E   
+            Z, _, accp_rate = self.HMC.generate_samples_HMC(mus, torch.exp(logvars), chains=samples)
+            self.log('mean_acceptance_rate', accp_rate, on_step=True, on_epoch=True, prog_bar=False, logger=True)
+            Z = self.make_tensor_list(Z)
+
+            if all_layers: 
+                return Z, mus, logvars
+            else: return Z[0], mus, logvars
+
+
 
     def preprocess_batch(self, batch: tuple):
         """

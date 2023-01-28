@@ -7,6 +7,8 @@
 
 from typing import Dict
 from src.models.base import *
+from src.models.h_vae_no_reparam import HVAENoReparam
+from src.models.hh_vae_no_reparam import HHVAENoReparam
 from src.models.miwae import *
 from src.models.hmc_vae import *
 from src.models.h_vae import *
@@ -47,8 +49,12 @@ def create_model(model: str, config: Dict) -> object:
         model = HMCVAE(**config)
     elif model=='HVAE':
         model = HVAE(**config)
+    elif model=='HVAEnoreparam':
+        model = HVAENoReparam(**config)
     elif model=='HHVAE':
         model = HHVAE(**config) 
+    elif model=='HHVAEnoreparam':
+        model = HHVAENoReparam(**config) 
     elif model=='VAEM':
         model = VAEM(**config)
     elif model=='MIWAEM':
@@ -118,7 +124,11 @@ def load_model(model: str, path: str, device: str) -> object:
         model = HMCVAE.load_from_checkpoint(path, device=device).eval().to(device)
     elif model=='HVAE':
         model = HVAE.load_from_checkpoint(path, device=device).eval().to(device)
+    elif model=='HVAEnoreparam':
+        model = HVAENoReparam.load_from_checkpoint(path, device=device).eval().to(device)
     elif model=='HHVAE':
+        model = HHVAE.load_from_checkpoint(path, device=device).eval().to(device)
+    elif model=='HHVAEnoreparam':
         model = HHVAE.load_from_checkpoint(path, device=device).eval().to(device)
     elif model=='VAEM':
         model = VAEM.load_from_checkpoint(path, device=device).eval().to(device)

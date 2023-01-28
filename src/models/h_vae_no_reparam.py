@@ -12,9 +12,9 @@ warnings.filterwarnings("ignore", message="Setting attributes on ParameterList i
 
 # ============= HVAE submodules ============= #
 
-class HierarchicalPrior(nn.Module):
+class HierarchicalPriorNoReparam(nn.Module):
     """
-    Implements a Hierarchical Generative model with reparameterized layers
+    Implements a Hierarchical Generative model
 
     """
     
@@ -29,7 +29,7 @@ class HierarchicalPrior(nn.Module):
         """
         
         
-        super(HierarchicalPrior, self).__init__()
+        super(HierarchicalPriorNoReparam, self).__init__()
 
         self.layers = len(latent_dims)
         self.latent_dims = latent_dims
@@ -42,12 +42,12 @@ class HierarchicalPrior(nn.Module):
         
         self.logvar = torch.nn.ParameterList([torch.nn.Parameter(torch.zeros(l)) for l in latent_dims])
 
-    def forward(self, E: list, observed: torch.Tensor=None) -> torch.Tensor:
+    def forward(self, Z: list, mus: list, logvars: list, observed: torch.Tensor=None) -> torch.Tensor:
         """
         Computes the log probs of each layer 
 
         Args:
-            E (list): contains the latent samples epsilon at each layer
+            Z (list): contains the latent samples epsilon at each layer
             observed (torch.Tensor, optional): observed mask. If given, true values when both data and target are unobserved. Defaults to None.
 
         Returns:
@@ -55,12 +55,32 @@ class HierarchicalPrior(nn.Module):
         """
         
         logp = []
-        logvar = self.get_logvar()
-        for l, e in enumerate(E):
-            cnt = e.size(-1) * np.log(2 * np.pi) + torch.sum(logvar[l], dim=-1)
-            logp_l = -0.5 * (cnt + torch.sum(e**2 * torch.exp(-logvar[l]), dim=-1))
+        for l, z in enumerate(Z):
+            # Compute logp
+            mu = mus[l]
+            logvar = logvars[l]
+
+            cnt = z.size(-1) * np.log(2 * np.pi) + torch.sum(logvar, dim=-1)
+            logp_l = -0.5 * (cnt + torch.sum((z-mu)**2 * torch.exp(-logvar[l]), dim=-1))
             logp.append(logp_l * observed)
         return torch.stack(logp, 0)
+
+    
+    def generative_path(self, Z):
+        # We sample top-down (from zL to z1). zL follows standard prior prior
+        mus = [torch.zeros_like(Z[-1])]
+        logvars = [torch.zeros_like(mus[0])]
+
+        for l in np.arange(self.layers-2, -1, -1):
+            mu_l, logvar_l = torch.chunk(self.NNs[l](Z[l+1]), 2, dim=-1)
+            mus.append(mu_l)
+            logvars.append(logvar_l)
+        
+        mus = mus[::-1]
+        logvars = logvars[::-1]
+
+        return mus, logvars
+
 
     def update_prior(self, E: list):
         """
@@ -84,7 +104,6 @@ class HierarchicalPrior(nn.Module):
         deactivate(logvar)
         return logvar
 
-    def generative_path(self, E: list):
         
         # Top layer
         Z = [E[-1]]
@@ -101,7 +120,7 @@ class HierarchicalPrior(nn.Module):
 
         return Z
 
-class HierarchicalEncoder(nn.Module):
+class HierarchicalEncoderNoReparam(nn.Module):
     """
     Implements a Hierarchical Encoder
     """
@@ -119,7 +138,7 @@ class HierarchicalEncoder(nn.Module):
             anneal_kl_steps (float, optional): number of steps for annealing the KL. Defaults to 1e3.
         """
         
-        super(HierarchicalEncoder, self).__init__()
+        super(HierarchicalEncoderNoReparam, self).__init__()
 
         self.layers = len(latent_dims)
         self.latent_dims = latent_dims
@@ -155,14 +174,14 @@ class HierarchicalEncoder(nn.Module):
             - list with the means for each layer
             - list with the logvars for each layer
         """
-        mu = []
-        logvar = []
+        deltas_mu = []
+        deltas_logvar = []
         for l in range(self.layers):
             mu_l, logvar_l = torch.chunk(self.encoders[l](R[l]), 2, -1)
-            mu.append(mu_l)
-            logvar.append(logvar_l)
+            deltas_mu.append(mu_l)
+            deltas_logvar.append(logvar_l)
 
-        return mu, logvar
+        return deltas_mu, deltas_logvar
         
     def forward(self, x: torch.Tensor) -> tuple:
         """
@@ -176,10 +195,10 @@ class HierarchicalEncoder(nn.Module):
             - list with the logvars for each layer
         """
         R = self._deterministic_path(x)
-        mu, logvar = self._encode(R)
-        return mu, logvar
+        deltas_mu, deltas_logvar = self._encode(R)
+        return deltas_mu, deltas_logvar
 
-    def regularizer(self, mus: list, logvars: list, observed) -> torch.Tensor:
+    def regularizer(self, deltas_mu: list, deltas_logvar: list, logvars: list, observed) -> torch.Tensor:
         """
         Computes the list of KLs for each latent layer
 
@@ -193,11 +212,12 @@ class HierarchicalEncoder(nn.Module):
         """
         
         KLs = []
-        logvar = self.get_logvar()
         for l in range(self.layers):
-            logvar_p = logvar[l].squeeze(0)
-            # KL for diagonal Gaussians with 0-mean prior
-            KL = -0.5 * torch.sum(1. + logvars[l] - logvar_p - mus[l]**2 * torch.exp(-logvar_p) - torch.exp(logvars[l]) * torch.exp(-logvar_p), dim=-1, keepdim=True)
+            delta_mu = deltas_mu[l]
+            delta_logvar = deltas_logvar[l]
+            logvar = logvars[l]
+            KL = 0.5 * (delta_mu.unsqueeze(-2)**2 / torch.exp(logvar) + torch.exp(delta_logvar.unsqueeze(-2)) -\
+                    delta_logvar.unsqueeze(-2) - 1).sum(-1)
             KL = KL * observed
             KLs.append(KL)
 
@@ -251,7 +271,7 @@ class HierarchicalEncoder(nn.Module):
 
 # ============= HVAE ============= #
 
-class HVAE(BaseVAE):
+class HVAENoReparam(BaseVAE):
     """
     Implements a Hierarchical VAE (H-VAE) as described in https://arxiv.org/abs/2202.04599
 
@@ -266,7 +286,7 @@ class HVAE(BaseVAE):
             update_prior = False
             ):
         """
-        HVAE initialization
+        HHVAENoReparamVAE initialization
 
         Args:
             dataset (str): name of the dataset (boston, mnist, ...)
@@ -291,7 +311,7 @@ class HVAE(BaseVAE):
             anneal_kl_steps (float, optional): number of steps for annealing the KL. Defaults to 1e3.
             update_prior (bool, optional): update the prior variance via ML and VI at the end of each epoch (True). Defaults to False.
         """
-        super(HVAE, self).__init__(dataset=dataset, dim_x=dim_x, dim_y=dim_y, 
+        super(HVAENoReparam, self).__init__(dataset=dataset, dim_x=dim_x, dim_y=dim_y, 
             latent_dim = latent_dims[0], arch=arch, dim_h=dim_h, likelihood_x = likelihood_x, likelihood_y = likelihood_y, 
             variance=variance, imbalanced_y=imbalanced_y,
             categories_y=categories_y,
@@ -305,8 +325,8 @@ class HVAE(BaseVAE):
 
         input_encoder, _, _ = get_arch(dim_x, dim_y, int(dim_h/2), arch, 1, categories_y, dim_h)   # use dim_h/2 here as latent dim because we have an extra MLP for encoding to z
 
-        self.prior = HierarchicalPrior(latent_dims, dim_h)
-        self.encoder = HierarchicalEncoder(dim_x, dim_y, latent_dims, dim_h, input_encoder, 
+        self.prior = HierarchicalPriorNoReparam(latent_dims, dim_h)
+        self.encoder = HierarchicalEncoderNoReparam(dim_x, dim_y, latent_dims, dim_h, input_encoder, 
             balance_kl_steps=balance_kl_steps, anneal_kl_steps=anneal_kl_steps)
 
         # collect all norm params in Linear layers
@@ -324,7 +344,7 @@ class HVAE(BaseVAE):
 
     # ============= Modified base functions ============= #
 
-    def sample_z(self, mus: list, logvars: list, samples=1, all_layers=False):
+    def sample_z(self, deltas_mu: list, deltas_logvar: list, samples=1, all_layers=False):
         """
         Draw latent reparameterized samples Z from a given approx hierarchical posterior of Epsilon, parameterized by mu and logvar
 
@@ -338,32 +358,75 @@ class HVAE(BaseVAE):
         Returns:
             samples from the shallow layer (default) or list with samples from all layers (from z1 to zL)
         """
-        mus = [m.repeat(samples, 1, 1).permute(1, 0, 2) for m in mus]
-        logvars = [l.repeat(samples, 1, 1).permute(1, 0, 2) for l in logvars]
+        deltas_mu = [d.repeat(samples, 1, 1).permute(1, 0, 2) for d in deltas_mu]
+        deltas_logvar = [d.repeat(samples, 1, 1).permute(1, 0, 2) for d in deltas_logvar]
 
-        # Top layer
-        Z = [reparameterize(mus[-1], torch.exp(logvars[-1]))]
-        E = [Z[-1].clone()]
+        # We sample top-down (from zL to z1). zL follows standard prior prior
+        mus = [torch.zeros_like(deltas_mu[-1])]
+        logvars = [torch.zeros_like(mus[0])]
+
+        Z = [reparameterize(deltas_mu[-1], torch.exp(deltas_logvar[-1]))]
         for l in np.arange(self.layers-2, -1, -1):
-            mu_z, logvar_z = torch.chunk(self.prior.NNs[l](Z[-1]), 2, dim=-1)
-            e = reparameterize(mus[l], torch.exp(logvars[l])) # sampled from the approx posterior
-            E.append(e)
-            z = mu_z + torch.sqrt(torch.exp(logvar_z)) * e
-            Z.append(z)
+            mu_l, logvar_l = torch.chunk(self.prior.NNs[l](Z[-1]), 2, dim=-1)
+            mus.append(mu_l)
+            logvars.append(logvar_l)
+            Z.append(reparameterize(mu_l + deltas_mu[l], torch.exp(logvar_l + deltas_logvar[l])))
 
         # Flip Z to follow the notation of the model (element 0 -> z1)
         Z = Z[::-1]
-        E = E[::-1]
-        E = torch.cat(E, -1)
-
-        if self.training and self.validation==False:
-            self.E_epoch.append(E.reshape(E.shape[0], np.sum(self.latent_dims)))
-
-        #Z = torch.cat(Z, -1)
+        mus = mus[::-1]
+        logvars = logvars[::-1]
 
         if all_layers: 
-            return Z
-        else: return Z[0]
+            return Z, mus, logvars
+        else: return Z[0], mus, logvars
+
+    def forward(self, batch: tuple, samples: int) -> tuple:
+        """
+        Computes the mean ELBO for a given batch
+
+        Args:
+            batch (tuple): contains (data, observed_data, target, observed_target)
+            samples (int): number of MC samples for computing the ELBO
+
+        Returns:
+            torch.Tensor: mean loss (negative ELBO)                          
+            torch.Tensor: Reconstruction term for x logp(x|z)           
+            torch.Tensor: Reconstruction term for y logp(y|z,x)    
+            torch.Tensor: KL term     
+
+        """
+        # Get data
+        x, observed_x, y, observed_y = batch
+        xn = self.normalize_x(x)
+        xt, yt, xy, observed = self.preprocess_batch(batch) 
+        # xt is the preprocessed input (xt=x if no preprocessing)
+        # observed is observed_x OR observed_y (for not using kl if no observed data)
+        deltas_mu, deltas_logvar = self.encoder(xy)
+        
+        z, mus, logvars = self.sample_z(deltas_mu, deltas_logvar, samples=samples)
+
+        theta_x = self.decoder(z)
+        x_hat = self.build_x_hat(xn, observed_x, theta_x)
+
+        zx = torch.cat([z,x_hat],dim=-1)
+
+        rec_x = self.decoder.logp(xt, observed_x, z=z, theta=theta_x).sum(-1)
+        rec_y = self.predictor.logp(yt, observed_y, z=zx).sum(-1)
+        kls = self.encoder.regularizer(deltas_mu, deltas_logvar, logvars, observed)
+        
+        elbo = rec_x + rec_y - kls.sum(0).unsqueeze(-1)
+
+        elbo = elbo[elbo!=0].mean()
+        rec_x = rec_x[rec_x!=0].mean()
+        rec_y = rec_y[rec_y!=0].mean()
+
+        kl_mean = torch.zeros(len(kls)).type_as(rec_x)
+        for l, kl in enumerate(kls):
+            kl_mean[l]= kl[kl!=0].mean()
+
+        return -elbo, rec_x, rec_y, kl_mean
+     
 
     def training_step(self, batch: tuple, batch_idx: int, logging: bool=True):
         """
@@ -452,7 +515,7 @@ class HVAE(BaseVAE):
             loss += torch.sum(sigma)
         return loss
 
-    def logp(self, xt: torch.Tensor, observed_x: torch.Tensor, yt: torch.Tensor, observed_y: torch.Tensor, e: list, xn: torch.Tensor=None) -> torch.Tensor:
+    def logp(self, xt: torch.Tensor, observed_x: torch.Tensor, yt: torch.Tensor, observed_y: torch.Tensor, z: list, xn: torch.Tensor=None) -> torch.Tensor:
         """
         Returns the log joint logp(x, y, epsilon) of the model
 
@@ -473,21 +536,13 @@ class HVAE(BaseVAE):
             xn = xt
 
         # If z is from the latent joint, we separate each layer
-        if type(e)!= list:
-            E = self.make_tensor_list(e)
+        if type(z)!= list:
+            Z = self.make_tensor_list(z)
 
-        else: E = e
+        else: Z = z
 
-        # Compute zs
-        # Top layer
-        Z = [E[-1].clone()]
-        for l in np.arange(self.layers-2, -1, -1):
-            mu_z, logvar_z = torch.chunk(self.prior.NNs[l](Z[-1]), 2, dim=-1)
-            z = mu_z + torch.sqrt(torch.exp(logvar_z)) * E[l]
-            Z.append(z)
-        Z = Z[::-1]
-            
-        theta_x = self.decoder(Z[0]).reshape(z.shape[0], -1, xt.shape[-1])
+
+        theta_x = self.decoder(Z[0]).reshape(Z[0].shape[0], -1, xt.shape[-1])
 
         x_hat = self.build_x_hat(xn, observed_x, theta_x)
         zx = torch.cat([Z[0],x_hat],dim=-1)
@@ -496,14 +551,16 @@ class HVAE(BaseVAE):
         logpy_z = self.predictor.logp(yt, observed_y, z=zx).sum(-1)
 
         observed = torch.logical_or(observed_x.sum(-1, keepdim=True)>0, observed_y.sum(-1, keepdim=True)>0)
-        logpz = self.prior(E, observed)
+        mus, logvars = self.prior.generative_path(Z)
+        logpz = self.prior(Z, mus, logvars, observed)
 
         logp = logpx_z + logpy_z + logpz.sum(0)
 
         return logp
 
-    def logq(self, e: list, xt: torch.Tensor, observed_x: torch.Tensor, yt: torch.Tensor, observed_y: torch.Tensor) -> torch.Tensor:
+    def logq(self, z: list, xt: torch.Tensor, observed_x: torch.Tensor, yt: torch.Tensor, observed_y: torch.Tensor) -> torch.Tensor:
         """
+        [TODO]
         Computes the log prob of a latent sample under approximated Gaussian posterior given by the encoder
 
         Args:
@@ -517,11 +574,11 @@ class HVAE(BaseVAE):
             torch.Tensor: log probs                                                          (batch_size, 1) 
         """
 
-        if type(e)!= list:
-            E = self.make_tensor_list(e)
+        if type(z)!= list:
+            Z = self.make_tensor_list(z)
 
         else:
-            E = e
+            Z = z
         # xt and yt must be normalised
         xo = xt * observed_x
         x_tilde = torch.cat([xo, observed_x], axis=1)
@@ -533,13 +590,13 @@ class HVAE(BaseVAE):
         xy = torch.cat([x_tilde, y_tilde], axis=1)
         mus, logvars = self.encoder(xy)
         
-        samples = E[0].shape[-2]
+        samples = Z[0].shape[-2]
         mus = [d.repeat(samples, 1, 1).permute(1, 0, 2) for d in mus]
         logvars = [d.repeat(samples, 1, 1).permute(1, 0, 2) for d in logvars]
 
         observed = torch.logical_or(observed_x.sum(-1, keepdim=True)>0, observed_y.sum(-1, keepdim=True)>0)
         logq_xy = []
-        for (e_l, mu_l, logvar_l) in zip(E, mus, logvars):
+        for (e_l, mu_l, logvar_l) in zip(Z, mus, logvars):
             cnt = mu_l.shape[-1] * np.log(2 * np.pi) + torch.sum(logvar_l, dim=-1)
             logq_l = -0.5 * (cnt + torch.sum((e_l - mu_l)**2 * torch.exp(-logvar_l), dim=-1))
             logq_xy.append(logq_l * observed)
@@ -628,5 +685,5 @@ class HVAE(BaseVAE):
     # ============= Modified PL functions ============= #
     def configure_optimizers(self):
         opt = torch.optim.Adam(list(self.decoder.parameters()) + list(self.predictor.parameters()) + list(self.prior.parameters()) +
-                                   list(self.encoder.parameters()), lr=self.lr, weight_decay=0.01)    
+                                   list(self.encoder.parameters()), lr=self.lr)    
         return [opt]

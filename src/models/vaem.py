@@ -262,11 +262,25 @@ class VAEM(BaseVAE):
         # mean per sample
         ll_xu = ll_xu[torch.isfinite(ll_xu)].mean()
 
+        # Log-likelihood of the observed variables
+        rec = []
+        for d, margVAE in enumerate(self.margVAEs):
+            rec.append(margVAE.decoder.logp(xn[:, d].unsqueeze(-1), 
+                observed_x[:, d].unsqueeze(-1), z=zd[..., d].unsqueeze(-1)))
+        rec = torch.cat(rec, dim=-1)
+        # mean per dimension
+        rec = rec.sum(-1, keepdim=True) / observed_x.sum(-1, keepdim=True).unsqueeze(-2)
+        ll_xo = torch.logsumexp(rec, dim=-2) - np.log(samples)
+
+        # mean per sample
+        ll_xo = ll_xo[torch.isfinite(ll_xo)].mean()
+
         self.log('{}_test'.format(self.prediction_metric_name), metric, on_step=False, on_epoch=True, prog_bar=True, logger=True)
         self.log('ll_y_test', ll_y, on_step=False, on_epoch=True, prog_bar=True, logger=True)
         self.log('ll_xu_test', ll_xu, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log('ll_xo_test', ll_xo, on_step=False, on_epoch=True, prog_bar=True, logger=True)
 
-        return {"ll_y_test": ll_y, "ll_x_test": ll_xu, "metric_test": metric, "elbo_test": elbo}'''
+        return {"ll_y_test": ll_y, "ll_xu_test": ll_xu, "ll_xo_test": ll_xo, "metric_test": metric, "elbo_test": elbo}'''
     
     def test_step(self, batch: tuple, batch_idx: int, samples=1000, *args, **kwargs) -> dict:
         """
@@ -335,10 +349,17 @@ class VAEM(BaseVAE):
         #theta_x = self.invert_preproc_theta(theta_x)
         # Log-likelihood of the unobserved variables
         rec = []
+        ll_xu_d = []
         for d, margVAE in enumerate(self.margVAEs):
             rec.append(margVAE.decoder.logp(xn[:, d].unsqueeze(-1), 
                 torch.logical_not(observed_x)[:, d].unsqueeze(-1), z=zd[..., d].unsqueeze(-1)))
+            _ll_xu_d = torch.logsumexp(rec[-1], dim=-2) - np.log(samples)
+            _ll_xu_d = _ll_xu_d[torch.logical_not(observed_x)[:, d].bool()].mean().view(1)
+            ll_xu_d.append(_ll_xu_d)
+
         rec = torch.cat(rec, dim=-1)
+        ll_xu_d = torch.cat(ll_xu_d, dim=-1)
+
         # mean per dimension
         rec = rec.sum(-1, keepdim=True) / torch.logical_not(observed_x).sum(-1, keepdim=True).unsqueeze(-2)
         ll_xu = torch.logsumexp(rec, dim=-2) - np.log(samples)
@@ -346,7 +367,36 @@ class VAEM(BaseVAE):
         # mean per sample
         ll_xu = ll_xu[torch.isfinite(ll_xu)].mean()
 
-        return {'ll_y': ll_y, 'metric': metric, 'll_xu': ll_xu}   
+        # Log-likelihood of the observed variables
+        rec = []
+        ll_xo_d = []
+        for d, margVAE in enumerate(self.margVAEs):
+            rec.append(margVAE.decoder.logp(xn[:, d].unsqueeze(-1), 
+                observed_x[:, d].unsqueeze(-1), z=zd[..., d].unsqueeze(-1)))
+            _ll_xo_d = torch.logsumexp(rec[-1], dim=-2) - np.log(samples)
+            _ll_xo_d = _ll_xo_d[observed_x[:, d].bool()].mean().view(1)
+            ll_xo_d.append(_ll_xo_d)
+        rec = torch.cat(rec, dim=-1)
+        ll_xo_d = torch.cat(ll_xo_d, dim=-1)
+
+        # mean per dimension
+        rec = rec.sum(-1, keepdim=True) / observed_x.sum(-1, keepdim=True).unsqueeze(-2)
+        ll_xo = torch.logsumexp(rec, dim=-2) - np.log(samples)
+
+        # mean per sample
+        ll_xo = ll_xo[torch.isfinite(ll_xo)].mean()
+        
+        # Metrics of the imputation of unobserved variables
+        metrics_xu = []
+        for d, margVAE in enumerate(self.margVAEs):
+            metrics_xu.append(margVAE.metric(xn[:, d].unsqueeze(-1), 
+                torch.logical_not(observed_x)[:, d].unsqueeze(-1), z=zd[..., d].unsqueeze(-1)))
+        metrics_xu = torch.cat(metrics_xu, dim=-1)
+
+        mean_error_xu = metrics_xu.mean()
+
+        return {'ll_y': ll_y, 'metric': metric, 'll_xu': ll_xu, 'll_xu_d': ll_xu_d, 'll_xo': ll_xo,
+                 'll_xo_d': ll_xo_d, 'metrics_xu': metrics_xu, 'mean_error_xu': mean_error_xu}   
     
     def build_x_hat(self, x: torch.Tensor, observed_x: torch.Tensor, theta_z: torch.Tensor, sample_z = True) -> torch.Tensor:
         """
@@ -568,6 +618,7 @@ class VAEM(BaseVAE):
             y = torch.exp(logy) - 1
         else: y = yn
         return y
+
 
     # ============= Modified PL functions ============= #
     def train_dataloader(self):
@@ -991,6 +1042,43 @@ class margVAE(pl.LightningModule):
         
         # When all the data is observed, logp will be nan
         return ll_xu
+
+    def metric(self, x: torch.Tensor, observed_x: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
+        """
+        Computes the chosen prediction metric 
+
+        Args:
+            theta_x (torch.Tensor): parameters of the likelihood distribution           (batch_size, latent_samples, dim_x)
+            y (torch.Tensor): true target                                               (batch_size, dim_y)
+
+        Returns:
+            torch.Tensor: mean metric
+        """
+
+        
+
+        theta_x = self.decoder(z).mean(-2)
+
+        if self.likelihood_x=='bernoulli':
+            x_pred = torch.round(torch.sigmoid(theta_x))
+        elif self.likelihood_x=='categorical':
+            x_pred = torch.argmax(torch.exp(theta_x), dim=-1, keepdim=True)
+        else:
+            x_pred = theta_x
+        
+        #x_pred = self.denormalize_x(x_pred)
+        #x = self.denormalize_x(x)
+        x = x[observed_x.bool()]
+
+        x_pred = x_pred[observed_x.bool()]
+
+        if self.likelihood_x.__contains__('gaussian'):
+            metric = torch.sqrt(torch.nn.MSELoss()(x_pred, x))
+        elif self.likelihood_x=='bernoulli' or self.likelihood_x=='categorical':
+            metric = (x_pred!=x).float().mean()
+            
+        return metric.view(1)
+
 
     def elbo(self, batch: tuple, samples=1000) -> torch.Tensor:
         """

@@ -5,6 +5,7 @@
 #  been included as part of this package.                                       +
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+from pydoc import doc
 from src import *
 from pytorch_lightning.loggers import TensorBoardLogger
 import argparse
@@ -87,3 +88,32 @@ if __name__ == '__main__':
             if not os.path.isdir(log_path):
                 os.makedirs(log_path+ '/checkpoints/')
             np.save('{}/test_metrics'.format(log_path), metrics_np)
+
+
+
+
+for i in boston energy wine concrete yatch;
+do
+for j in MIWAEM;
+do
+python test_splits.py --dataset $i --model $j
+done
+done
+
+
+
+
+
+for i in boston energy wine concrete diabetes yatch naval avocado insurance bank;
+do
+python test_splits_xo_d.py --dataset $i
+done
+
+
+
+
+
+
+
+
+boston wine concrete yatch;
