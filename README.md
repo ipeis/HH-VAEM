@@ -92,7 +92,7 @@ You can also try running the inpainting experiment using:
 python inpainting.py --models VAE HVAE HMCVAE HHVAE --dataset celeba --split 0
 ```
 
-which will stack a row of inpainted images for each of the given models.
+which will stack a row of inpainted images for each of the given models, after two rows with the original and observed images, respectively.
 
 <br>
 <p align="center">
